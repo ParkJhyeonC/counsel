@@ -23,19 +23,38 @@ BASE_DIR = Path(__file__).resolve().parent
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
 
 
-def find_project_root(start_dir: Path) -> Path:
-    """Find the nearest parent that contains templates/static folders."""
-    for candidate in [start_dir, *start_dir.parents]:
-        if (candidate / "templates").is_dir() and (candidate / "static").is_dir():
-            return candidate
-    return start_dir
+def detect_template_dir(start_dir: Path) -> Path:
+    """Find a usable template directory even if files were moved on Windows."""
+    candidates = [start_dir, *start_dir.parents, Path.cwd(), *Path.cwd().parents]
+
+    # 1) Standard layout: <root>/templates/index.html
+    for base in candidates:
+        tdir = base / "templates"
+        if (tdir / "index.html").is_file() and (tdir / "base.html").is_file():
+            return tdir
+
+    # 2) Fallback: current folder itself contains template files (e.g. app.py copied into templates/)
+    for base in candidates:
+        if (base / "index.html").is_file() and (base / "base.html").is_file():
+            return base
+
+    return start_dir / "templates"
 
 
-PROJECT_ROOT = find_project_root(BASE_DIR)
+def detect_static_dir(template_dir: Path) -> Path:
+    """Resolve static dir near template dir; fall back to cwd/static."""
+    nearby = [template_dir.parent / "static", template_dir / "static", BASE_DIR / "static", Path.cwd() / "static"]
+    for sdir in nearby:
+        if sdir.is_dir():
+            return sdir
+    return template_dir.parent / "static"
+
+
+TEMPLATE_DIR = detect_template_dir(BASE_DIR)
+STATIC_DIR = detect_static_dir(TEMPLATE_DIR)
+PROJECT_ROOT = TEMPLATE_DIR.parent if TEMPLATE_DIR.name == "templates" else BASE_DIR
 DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
-TEMPLATE_DIR = PROJECT_ROOT / "templates"
-STATIC_DIR = PROJECT_ROOT / "static"
 
 
 def create_app() -> Flask:

@@ -47,6 +47,11 @@ cmd /c scripts\run.bat
 - `TemplateNotFound: index.html` 오류가 나오면, **압축을 풀 때 폴더 구조가 유지되었는지** 확인하세요.  
   `templates/index.html`, `templates/base.html`, `static/style.css` 파일이 프로젝트 내부에 있어야 합니다.
 
+- 아래 명령으로 템플릿 파일 존재를 빠르게 확인할 수 있습니다.
+```bat
+dir templates
+```
+
 ## 수동 실행 방법
 ```bash
 python3 -m venv .venv

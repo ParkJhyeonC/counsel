@@ -148,12 +148,19 @@ def create_app() -> Flask:
         if request.method == "POST":
             student_id = request.form.get("student_id", "").strip()
             schedule_date = request.form.get("schedule_date", "").strip()
-            schedule_time = request.form.get("schedule_time", "").strip()
+            schedule_slot = request.form.get("schedule_slot", "").strip()
+            custom_slot = request.form.get("custom_slot", "").strip()
             title = request.form.get("title", "").strip()
             note = request.form.get("note", "").strip()
 
+            schedule_time = schedule_slot
+            if schedule_slot == "직접입력":
+                schedule_time = custom_slot
+
             if not schedule_date or not title:
                 flash("상담일과 일정 제목은 필수입니다.")
+            elif schedule_slot == "직접입력" and not custom_slot:
+                flash("직접입력을 선택한 경우 시간/교시를 입력해 주세요.")
             else:
                 execute_db(
                     """

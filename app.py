@@ -144,6 +144,18 @@ def create_app() -> Flask:
         next_month = date(calendar_year + 1, 1, 1) if calendar_month == 12 else date(calendar_year, calendar_month + 1, 1)
 
         student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
+        edit_schedule_id = request.values.get("edit_id", "").strip()
+        edit_schedule = None
+        if edit_schedule_id.isdigit():
+            edit_schedule = query_db(
+                """
+                SELECT id, student_id, schedule_date, schedule_time, title, note, status
+                FROM counsel_schedules
+                WHERE id = ?
+                """,
+                (int(edit_schedule_id),),
+                one=True,
+            )
 
         if request.method == "POST":
             student_id = request.form.get("student_id", "").strip()
@@ -162,21 +174,39 @@ def create_app() -> Flask:
             elif schedule_slot == "직접입력" and not custom_slot:
                 flash("직접입력을 선택한 경우 시간/교시를 입력해 주세요.")
             else:
-                execute_db(
-                    """
-                    INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
-                    VALUES (?, ?, ?, ?, ?, 'planned', ?)
-                    """,
-                    (
-                        student_id or None,
-                        schedule_date,
-                        schedule_time or None,
-                        title,
-                        note,
-                        datetime.now().isoformat(timespec="seconds"),
-                    ),
-                )
-                flash("상담 일정이 등록되었습니다.")
+                if edit_schedule and edit_schedule["status"] == "planned":
+                    execute_db(
+                        """
+                        UPDATE counsel_schedules
+                        SET student_id = ?, schedule_date = ?, schedule_time = ?, title = ?, note = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            student_id or None,
+                            schedule_date,
+                            schedule_time or None,
+                            title,
+                            note,
+                            edit_schedule["id"],
+                        ),
+                    )
+                    flash("상담 일정이 수정되었습니다.")
+                else:
+                    execute_db(
+                        """
+                        INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, 'planned', ?)
+                        """,
+                        (
+                            student_id or None,
+                            schedule_date,
+                            schedule_time or None,
+                            title,
+                            note,
+                            datetime.now().isoformat(timespec="seconds"),
+                        ),
+                    )
+                    flash("상담 일정이 등록되었습니다.")
                 return redirect(url_for("schedule", date=schedule_date, month=schedule_date[:7]))
 
         schedules_for_date = query_db(
@@ -255,6 +285,7 @@ def create_app() -> Flask:
             schedules_for_date=schedules_for_date,
             month_counts=month_counts,
             upcoming_schedules=upcoming_schedules,
+            edit_schedule=edit_schedule,
         )
 
     @app.route("/students", methods=["GET", "POST"])
@@ -386,6 +417,23 @@ def create_app() -> Flask:
                         (int(linked_schedule_id),),
                     )
                     flash("연결된 상담 일정이 완료 처리되었습니다.")
+
+                if next_date:
+                    execute_db(
+                        """
+                        INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
+                        VALUES (?, ?, ?, ?, ?, 'planned', ?)
+                        """,
+                        (
+                            student_id,
+                            next_date,
+                            None,
+                            f"후속상담 - {summary}",
+                            action_plan,
+                            datetime.now().isoformat(timespec="seconds"),
+                        ),
+                    )
+                    flash("다음 상담일이 일정에 자동 등록되었습니다.")
 
                 flash("상담일지가 저장되었습니다.")
                 return redirect(url_for("student_detail", student_id=student_id))

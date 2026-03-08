@@ -53,6 +53,8 @@ cmd /c scripts\run.bat
 dir templates
 ```
 
+- **중요:** 오류 화면의 경로가 `...\templates\app.py`처럼 나오면, 잘못된 위치의 `app.py`를 실행한 것입니다.  
+  반드시 `c:\프로젝트폴더\app.py` 형태(루트)에 있어야 하며, `templates` 폴더 안에 `app.py`가 있으면 안 됩니다.
 ## 수동 실행 방법
 ```bash
 python3 -m venv .venv

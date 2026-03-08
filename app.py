@@ -22,42 +22,31 @@ from werkzeug.utils import secure_filename
 BASE_DIR = Path(__file__).resolve().parent
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
 
-
-def detect_template_dir(start_dir: Path) -> Path:
-    """Find a usable template directory even if files were moved on Windows."""
-    candidates = [start_dir, *start_dir.parents, Path.cwd(), *Path.cwd().parents]
-
-    # 1) Standard layout: <root>/templates/index.html
-    for base in candidates:
-        tdir = base / "templates"
-        if (tdir / "index.html").is_file() and (tdir / "base.html").is_file():
-            return tdir
-
-    # 2) Fallback: current folder itself contains template files (e.g. app.py copied into templates/)
-    for base in candidates:
-        if (base / "index.html").is_file() and (base / "base.html").is_file():
-            return base
-
-    return start_dir / "templates"
-
-
-def detect_static_dir(template_dir: Path) -> Path:
-    """Resolve static dir near template dir; fall back to cwd/static."""
-    nearby = [template_dir.parent / "static", template_dir / "static", BASE_DIR / "static", Path.cwd() / "static"]
-    for sdir in nearby:
-        if sdir.is_dir():
-            return sdir
-    return template_dir.parent / "static"
-
-
-TEMPLATE_DIR = detect_template_dir(BASE_DIR)
-STATIC_DIR = detect_static_dir(TEMPLATE_DIR)
-PROJECT_ROOT = TEMPLATE_DIR.parent if TEMPLATE_DIR.name == "templates" else BASE_DIR
+PROJECT_ROOT = BASE_DIR
+TEMPLATE_DIR = PROJECT_ROOT / "templates"
+STATIC_DIR = PROJECT_ROOT / "static"
 DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 
 
+def validate_project_layout() -> None:
+    required_files = [
+        PROJECT_ROOT / "app.py",
+        TEMPLATE_DIR / "index.html",
+        TEMPLATE_DIR / "base.html",
+        STATIC_DIR / "style.css",
+    ]
+    missing = [str(path) for path in required_files if not path.exists()]
+    if missing:
+        raise FileNotFoundError(
+            "프로젝트 폴더 구조를 찾을 수 없습니다. app.py와 templates/static 파일이 같은 프로젝트 루트에 있어야 합니다. "
+            f"누락 파일: {missing}"
+        )
+
+
 def create_app() -> Flask:
+    validate_project_layout()
+
     app = Flask(
         __name__,
         template_folder=str(TEMPLATE_DIR),

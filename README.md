@@ -11,6 +11,7 @@
 - 학생별 상담요약 인쇄/PDF 출력(기간 필터 지원)
 - 상담 통계(월간/년간) 조회
 - 상담일지의 다음 상담일 입력 시 일정 달력에 자동 연동
+- ChatGPT 기반 사례개념화 초안 생성(선택 기능, API 키 필요)
 - 첨부파일 로컬 저장(`data/uploads`)
 - SQLite 로컬 DB 저장(`data/counsel.db`)
 
@@ -63,6 +64,30 @@ dir templates
 
 - **중요:** 오류 화면의 경로가 `...\templates\app.py`처럼 나오면, 잘못된 위치의 `app.py`를 실행한 것입니다.  
   반드시 `c:\프로젝트폴더\app.py` 형태(루트)에 있어야 하며, `templates` 폴더 안에 `app.py`가 있으면 안 됩니다.
+
+## AI 사례개념화 보조 사용법 (선택)
+
+`new_log` 화면에서 **사례개념화 초안 생성** 버튼을 사용할 수 있습니다.
+
+1. OpenAI API 키를 환경변수로 설정
+   - macOS/Linux
+   ```bash
+   export OPENAI_API_KEY="여기에_키"
+   export OPENAI_MODEL="gpt-4.1-mini"   # 선택(미설정 시 기본값 사용)
+   ```
+   - Windows(CMD)
+   ```bat
+   set OPENAI_API_KEY=여기에_키
+   set OPENAI_MODEL=gpt-4.1-mini
+   ```
+2. `scripts/run.sh` 또는 `scripts\run.bat`로 앱 실행
+3. 상담요약/상담내용/조치사항을 작성 후 초안 생성
+
+> 개인정보 보호를 위해 앱에서 일부 패턴(전화번호/숫자정보/호칭 포함 이름)을 마스킹해 전송합니다.
+> 생성 결과는 반드시 상담교사가 검토/수정 후 사용하세요.
+
+---
+
 ## 수동 실행 방법
 ```bash
 python3 -m venv .venv

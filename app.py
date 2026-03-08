@@ -81,7 +81,115 @@ def create_app() -> Flask:
             LIMIT 10
             """
         )
-        return render_template("index.html", students=students, latest_logs=latest_logs)
+        upcoming_schedules = query_db(
+            """
+            SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.status, s.name AS student_name
+            FROM counsel_schedules c
+            LEFT JOIN students s ON s.id = c.student_id
+            WHERE c.status = 'planned' AND c.schedule_date >= ?
+            ORDER BY c.schedule_date ASC, c.schedule_time ASC, c.id ASC
+            LIMIT 7
+            """,
+            (datetime.now().date().isoformat(),),
+        )
+        return render_template(
+            "index.html",
+            students=students,
+            latest_logs=latest_logs,
+            upcoming_schedules=upcoming_schedules,
+        )
+
+    @app.route("/schedule", methods=["GET", "POST"])
+    def schedule() -> str:
+        selected_date = request.args.get("date", datetime.now().date().isoformat())
+        student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
+
+        if request.method == "POST":
+            student_id = request.form.get("student_id", "").strip()
+            schedule_date = request.form.get("schedule_date", "").strip()
+            schedule_time = request.form.get("schedule_time", "").strip()
+            title = request.form.get("title", "").strip()
+            note = request.form.get("note", "").strip()
+
+            if not schedule_date or not title:
+                flash("상담일과 일정 제목은 필수입니다.")
+            else:
+                execute_db(
+                    """
+                    INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
+                    VALUES (?, ?, ?, ?, ?, 'planned', ?)
+                    """,
+                    (
+                        student_id or None,
+                        schedule_date,
+                        schedule_time or None,
+                        title,
+                        note,
+                        datetime.now().isoformat(timespec="seconds"),
+                    ),
+                )
+                flash("상담 일정이 등록되었습니다.")
+                return redirect(url_for("schedule", date=schedule_date))
+
+        schedules_for_date = query_db(
+            """
+            SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.note, c.status,
+                   s.id AS student_id, s.name AS student_name, s.class_name
+            FROM counsel_schedules c
+            LEFT JOIN students s ON s.id = c.student_id
+            WHERE c.schedule_date = ?
+            ORDER BY c.schedule_time ASC, c.id ASC
+            """,
+            (selected_date,),
+        )
+
+        month_prefix = selected_date[:7]
+        month_rows = query_db(
+            """
+            SELECT schedule_date, COUNT(*) AS count
+            FROM counsel_schedules
+            WHERE schedule_date LIKE ?
+            GROUP BY schedule_date
+            ORDER BY schedule_date
+            """,
+            (f"{month_prefix}%",),
+        )
+        month_counts = {row["schedule_date"]: row["count"] for row in month_rows}
+
+        upcoming_schedules = query_db(
+            """
+            SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.status,
+                   s.id AS student_id, s.name AS student_name
+            FROM counsel_schedules c
+            LEFT JOIN students s ON s.id = c.student_id
+            WHERE c.status = 'planned' AND c.schedule_date >= ?
+            ORDER BY c.schedule_date ASC, c.schedule_time ASC, c.id ASC
+            LIMIT 20
+            """,
+            (datetime.now().date().isoformat(),),
+        )
+
+        return render_template(
+            "schedule.html",
+            students=student_rows,
+            selected_date=selected_date,
+            schedules_for_date=schedules_for_date,
+            month_counts=month_counts,
+            upcoming_schedules=upcoming_schedules,
+        )
+
+    @app.route("/schedule/<int:schedule_id>/done", methods=["POST"])
+    def complete_schedule(schedule_id: int):
+        execute_db(
+            """
+            UPDATE counsel_schedules
+            SET status = 'done'
+            WHERE id = ?
+            """,
+            (schedule_id,),
+        )
+        flash("상담 일정이 완료 처리되었습니다.")
+        return redirect(url_for("schedule", date=request.form.get("date", datetime.now().date().isoformat())))
 
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:
@@ -274,6 +382,18 @@ def init_db() -> None:
                 original_name TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(log_id) REFERENCES counsel_logs(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS counsel_schedules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER,
+                schedule_date TEXT NOT NULL,
+                schedule_time TEXT,
+                title TEXT NOT NULL,
+                note TEXT,
+                status TEXT NOT NULL DEFAULT 'planned',
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(student_id) REFERENCES students(id)
             );
             """
         )

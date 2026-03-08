@@ -6,7 +6,27 @@
   <div class="button-row">
     <a class="btn" href="{{ url_for('students') }}">학생 등록/조회</a>
     <a class="btn" href="{{ url_for('new_log') }}">상담일지 작성</a>
+    <a class="btn" href="{{ url_for('schedule') }}">상담 일정 관리</a>
   </div>
+</section>
+
+<section class="card">
+  <h2>예정된 상담 일정</h2>
+  <table>
+    <thead><tr><th>날짜</th><th>시간</th><th>학생</th><th>제목</th></tr></thead>
+    <tbody>
+      {% for row in upcoming_schedules %}
+      <tr>
+        <td>{{ row.schedule_date }}</td>
+        <td>{{ row.schedule_time or '-' }}</td>
+        <td>{{ row.student_name or '미지정' }}</td>
+        <td>{{ row.title }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">예정된 상담 일정이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
 </section>
 
 <section class="card">

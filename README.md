@@ -45,6 +45,7 @@ dir
 cmd /c scripts\run.bat
 ```
 
+- `scripts` 폴더에서 직접 실행해도 동작하도록 `run.bat`가 루트 경로를 자동 계산합니다.
 - `TemplateNotFound: index.html` 오류가 나오면, **압축을 풀 때 폴더 구조가 유지되었는지** 확인하세요.  
   `templates/index.html`, `templates/base.html`, `static/style.css` 파일이 프로젝트 내부에 있어야 합니다.
 

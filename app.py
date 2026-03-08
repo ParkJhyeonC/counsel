@@ -127,41 +127,48 @@ def create_app() -> Flask:
     def download_backup(filename: str):
         return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
 
-    @app.route("/ai/case-conceptualization", methods=["POST"])
-    def ai_case_conceptualization():
-        payload = request.get_json(silent=True) or {}
-        summary = payload.get("summary", "").strip()
-        detail = payload.get("detail", "").strip()
-        action_plan = payload.get("action_plan", "").strip()
-
-        if not summary and not detail and not action_plan:
-            return jsonify({"ok": False, "error": "사례개념화를 생성할 상담 내용이 없습니다."}), 400
+    @app.route("/students/<int:student_id>/ai/case-conceptualization", methods=["POST"])
+    def ai_case_conceptualization(student_id: int):
+        student = query_db(
+            "SELECT id, student_no, name, class_name FROM students WHERE id = ?",
+            (student_id,),
+            one=True,
+        )
+        if student is None:
+            return jsonify({"ok": False, "error": "학생을 찾을 수 없습니다."}), 404
 
         api_key = get_configured_openai_api_key()
         if not api_key:
-            return jsonify({"ok": False, "error": "OPENAI_API_KEY가 설정되지 않았습니다."}), 503
+            return jsonify({"ok": False, "error": "활성화된 OpenAI API 키가 없습니다. AI 설정에서 키를 등록하세요."}), 503
 
-        clean_summary = anonymize_text_for_ai(summary)
-        clean_detail = anonymize_text_for_ai(detail)
-        clean_action_plan = anonymize_text_for_ai(action_plan)
+        log_rows = query_db(
+            """
+            SELECT date, type, summary, detail, action_plan, next_date
+            FROM counsel_logs
+            WHERE student_id = ?
+            ORDER BY date ASC, created_at ASC
+            """,
+            (student_id,),
+        )
+        if not log_rows:
+            return jsonify({"ok": False, "error": "이 학생의 상담일지가 없어 사례개념화를 생성할 수 없습니다."}), 400
+
+        student_label = f"{student['class_name'] or '-'} {student['name']}({student['student_no']})"
+        case_context = build_case_context_from_logs(student_label, log_rows)
 
         system_prompt = (
             "당신은 한국 고등학교 상담교사를 돕는 상담 수퍼바이저다. "
-            "아래 내용을 바탕으로 사례개념화 초안을 한국어로 작성하라. "
+            "제공된 학생의 누적 상담기록을 종합하여 사례개념화 초안을 한국어로 작성하라. "
             "출력은 반드시 다음 항목 순서를 지켜라: "
-            "1) 핵심문제 2) 유지요인(개인/가정/학교/또래) 3) 보호요인 4) 개입가설 5) 다음회기 질문(3개) 6) 단기개입계획(1~2주)."
-        )
-        user_prompt = (
-            f"[상담요약]\n{clean_summary}\n\n"
-            f"[상담내용]\n{clean_detail}\n\n"
-            f"[조치사항/계획]\n{clean_action_plan}\n"
+            "1) 핵심문제 2) 경과요약(시간흐름) 3) 유지요인(개인/가정/학교/또래) "
+            "4) 보호요인 5) 개입가설 6) 다음회기 질문(3개) 7) 단기개입계획(1~2주)."
         )
 
         try:
             result_text = request_openai_case_conceptualization(
                 api_key=api_key,
                 system_prompt=system_prompt,
-                user_prompt=user_prompt,
+                user_prompt=case_context,
             )
             return jsonify({"ok": True, "result": result_text})
         except RuntimeError as exc:
@@ -204,6 +211,18 @@ def create_app() -> Flask:
             has_env_key=has_env_key,
             active_source=active_source,
         )
+
+    @app.route("/settings/ai/validate", methods=["POST"])
+    def ai_settings_validate():
+        api_key = get_configured_openai_api_key()
+        if not api_key:
+            return jsonify({"ok": False, "message": "활성화된 API 키가 없습니다."}), 200
+        try:
+            request_openai_api_health(api_key)
+            return jsonify({"ok": True, "message": "정상: API 키로 OpenAI 연결에 성공했습니다."}), 200
+        except RuntimeError as exc:
+            return jsonify({"ok": False, "message": str(exc)}), 200
+
 
     @app.route("/stats")
     def stats() -> str:
@@ -792,6 +811,42 @@ def anonymize_text_for_ai(text: str) -> str:
     masked = re.sub(r"[가-힣]{2,4}(?=\s?(학생|군|양|님))", "[학생]", masked)
     return masked
 
+
+
+
+def build_case_context_from_logs(student_label: str, log_rows: list[sqlite3.Row]) -> str:
+    lines = [f"[학생정보] {anonymize_text_for_ai(student_label)}", "[누적 상담일지]"]
+    for idx, row in enumerate(log_rows, start=1):
+        lines.append(
+            '\n'.join(
+                [
+                    f"- 기록 {idx}",
+                    f"  일자: {row['date']}",
+                    f"  유형: {row['type']}",
+                    f"  요약: {anonymize_text_for_ai(row['summary'] or '')}",
+                    f"  상세: {anonymize_text_for_ai(row['detail'] or '')}",
+                    f"  조치/계획: {anonymize_text_for_ai(row['action_plan'] or '')}",
+                    f"  다음상담일: {row['next_date'] or '-'}",
+                ]
+            )
+        )
+    return '\n'.join(lines)
+
+
+def request_openai_api_health(api_key: str) -> None:
+    req = url_request.Request(
+        "https://api.openai.com/v1/models",
+        method="GET",
+        headers={"Authorization": f"Bearer {api_key}"},
+    )
+    try:
+        with url_request.urlopen(req, timeout=20):
+            return
+    except url_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"OpenAI API 키 검증 실패: {detail}") from exc
+    except url_error.URLError as exc:
+        raise RuntimeError("OpenAI API 연결 실패: 네트워크를 확인하세요.") from exc
 
 
 def get_configured_openai_api_key() -> str:

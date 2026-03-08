@@ -12,6 +12,17 @@
   </form>
 </section>
 
+<section class="card">
+  <h2>AI 사례개념화 보조 (학생 누적 상담일지 기반)</h2>
+  <p class="muted">현재 학생의 누적 상담일지를 종합해 초안을 생성합니다. 결과는 반드시 상담교사가 검토/수정 후 사용하세요.</p>
+  <div class="button-row">
+    <button class="btn" type="button" id="generate-ai-case">사례개념화 초안 생성</button>
+  </div>
+  <label class="full">AI 생성 결과
+    <textarea id="ai-case-result" rows="14" placeholder="여기에 학생 누적 상담일지 기반 사례개념화 초안이 표시됩니다."></textarea>
+  </label>
+</section>
+
 {% for item in logs %}
 <section class="card log-card">
   <h3>{{ item.log.date }} - {{ item.log.type }}</h3>
@@ -30,4 +41,33 @@
 {% else %}
 <section class="card"><p>상담 이력이 없습니다.</p></section>
 {% endfor %}
+
+<script>
+  const generateBtn = document.getElementById('generate-ai-case');
+  const resultEl = document.getElementById('ai-case-result');
+
+  generateBtn.addEventListener('click', async () => {
+    generateBtn.disabled = true;
+    generateBtn.textContent = '생성 중...';
+
+    try {
+      const resp = await fetch('{{ url_for("ai_case_conceptualization", student_id=student.id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'student_detail' })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        resultEl.value = `오류: ${data.error || 'AI 생성에 실패했습니다.'}`;
+      } else {
+        resultEl.value = data.result;
+      }
+    } catch (e) {
+      resultEl.value = '오류: AI 요청 중 문제가 발생했습니다.';
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = '사례개념화 초안 생성';
+    }
+  });
+</script>
 {% endblock %}

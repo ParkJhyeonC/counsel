@@ -21,66 +21,12 @@
         <option>진로</option><option>학업</option><option>정서</option><option>생활지도</option><option>기타</option>
       </select>
     </label>
-    <label class="full">상담요약 <input id="summary" name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
-    <label class="full">상담내용 <textarea id="detail" name="detail" rows="4">{{ prefill_schedule.note if prefill_schedule else '' }}</textarea></label>
-    <label class="full">조치사항/추후계획 <textarea id="action_plan" name="action_plan" rows="3"></textarea></label>
+    <label class="full">상담요약 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
+    <label class="full">상담내용 <textarea name="detail" rows="4">{{ prefill_schedule.note if prefill_schedule else '' }}</textarea></label>
+    <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="3"></textarea></label>
     <label>다음 상담일 <input type="date" name="next_date"></label>
     <label>첨부파일 <input type="file" name="attachments" multiple></label>
     <button class="btn" type="submit">상담일지 저장</button>
   </form>
 </section>
-
-<section class="card">
-  <h2>AI 사례개념화 보조 (ChatGPT)</h2>
-  <p class="muted">민감정보를 최소화해 전송하며, 생성 결과는 반드시 상담교사가 검토/수정 후 사용하세요.</p>
-  <div class="button-row">
-    <button class="btn" type="button" id="generate-ai">사례개념화 초안 생성</button>
-    <button class="btn" type="button" id="append-ai">상담내용에 반영</button>
-  </div>
-  <label class="full">AI 생성 결과
-    <textarea id="ai-result" rows="12" placeholder="여기에 사례개념화 초안이 표시됩니다."></textarea>
-  </label>
-</section>
-
-<script>
-  const btnGenerate = document.getElementById('generate-ai');
-  const btnAppend = document.getElementById('append-ai');
-  const summaryEl = document.getElementById('summary');
-  const detailEl = document.getElementById('detail');
-  const actionPlanEl = document.getElementById('action_plan');
-  const resultEl = document.getElementById('ai-result');
-
-  btnGenerate.addEventListener('click', async () => {
-    btnGenerate.disabled = true;
-    btnGenerate.textContent = '생성 중...';
-    try {
-      const resp = await fetch('{{ url_for("ai_case_conceptualization") }}', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          summary: summaryEl.value || '',
-          detail: detailEl.value || '',
-          action_plan: actionPlanEl.value || ''
-        })
-      });
-      const data = await resp.json();
-      if (!resp.ok || !data.ok) {
-        resultEl.value = `오류: ${data.error || 'AI 생성에 실패했습니다.'}`;
-      } else {
-        resultEl.value = data.result;
-      }
-    } catch (e) {
-      resultEl.value = '오류: AI 요청 중 문제가 발생했습니다.';
-    } finally {
-      btnGenerate.disabled = false;
-      btnGenerate.textContent = '사례개념화 초안 생성';
-    }
-  });
-
-  btnAppend.addEventListener('click', () => {
-    if (!resultEl.value.trim()) return;
-    const separator = detailEl.value.trim() ? '\n\n---\n[AI 사례개념화 초안]\n' : '[AI 사례개념화 초안]\n';
-    detailEl.value = `${detailEl.value}${separator}${resultEl.value}`;
-  });
-</script>
 {% endblock %}

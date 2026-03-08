@@ -28,6 +28,7 @@ scripts\run.bat
 2. 의존성 설치
 3. DB 초기화 확인
 4. 서버 실행 (`http://localhost:5000`)
+5. (Windows `run.bat`) 기본 브라우저 자동 열기
 
 ---
 

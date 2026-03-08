@@ -257,20 +257,6 @@ def create_app() -> Flask:
             upcoming_schedules=upcoming_schedules,
         )
 
-    @app.route("/schedule/<int:schedule_id>/done", methods=["POST"])
-    def complete_schedule(schedule_id: int):
-        execute_db(
-            """
-            UPDATE counsel_schedules
-            SET status = 'done'
-            WHERE id = ?
-            """,
-            (schedule_id,),
-        )
-        flash("상담 일정이 완료 처리되었습니다.")
-        selected_date = request.form.get("date", datetime.now().date().isoformat())
-        return redirect(url_for("schedule", date=selected_date, month=selected_date[:7]))
-
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:
         if request.method == "POST":
@@ -321,6 +307,22 @@ def create_app() -> Flask:
     @app.route("/logs/new", methods=["GET", "POST"])
     def new_log() -> str:
         student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
+        schedule_id = request.values.get("schedule_id", "").strip()
+
+        prefill_schedule = None
+        if schedule_id.isdigit():
+            prefill_schedule = query_db(
+                """
+                SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.note, c.status,
+                       s.id AS student_id, s.name AS student_name, s.class_name
+                FROM counsel_schedules c
+                LEFT JOIN students s ON s.id = c.student_id
+                WHERE c.id = ?
+                """,
+                (int(schedule_id),),
+                one=True,
+            )
+
         if request.method == "POST":
             student_id = request.form.get("student_id", "").strip()
             date = request.form.get("date", "").strip()
@@ -329,6 +331,7 @@ def create_app() -> Flask:
             detail = request.form.get("detail", "").strip()
             action_plan = request.form.get("action_plan", "").strip()
             next_date = request.form.get("next_date", "").strip()
+            linked_schedule_id = request.form.get("schedule_id", "").strip()
 
             if not student_id or not date or not log_type or not summary:
                 flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
@@ -373,10 +376,25 @@ def create_app() -> Flask:
                             ),
                         )
 
+                if linked_schedule_id.isdigit():
+                    execute_db(
+                        """
+                        UPDATE counsel_schedules
+                        SET status = 'done'
+                        WHERE id = ?
+                        """,
+                        (int(linked_schedule_id),),
+                    )
+                    flash("연결된 상담 일정이 완료 처리되었습니다.")
+
                 flash("상담일지가 저장되었습니다.")
                 return redirect(url_for("student_detail", student_id=student_id))
 
-        return render_template("new_log.html", students=student_rows)
+        return render_template(
+            "new_log.html",
+            students=student_rows,
+            prefill_schedule=prefill_schedule,
+        )
 
     @app.route("/students/<int:student_id>/print")
     def student_print(student_id: int) -> str:

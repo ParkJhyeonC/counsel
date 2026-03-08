@@ -13,3 +13,7 @@ th, td { border-bottom:1px solid #ddd; padding:.5rem; text-align:left; }
 .flashes { list-style:none; padding:0; }
 .flashes li { background:#fef3c7; margin-bottom:.4rem; padding:.5rem; border-radius:6px; }
 .button-row { display:flex; gap:.7rem; }
+.search-form { display:flex; gap:.5rem; margin-bottom:.8rem; }
+.calendar-counts { display:flex; flex-wrap:wrap; gap:.45rem; }
+.day-chip { background:#e8eef6; border-radius:999px; padding:.3rem .6rem; font-size:.9rem; }
+.day-chip.selected { background:#2d6a4f; color:#fff; }

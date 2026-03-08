@@ -46,4 +46,5 @@ python -c "from app import init_db; init_db(); print('[INFO] DB initialization O
 if errorlevel 1 exit /b 1
 
 echo [INFO] Starting app at http://localhost:5000
+start "" http://localhost:5000
 python app.py

@@ -31,6 +31,19 @@ scripts\run.bat
 
 ---
 
+
+### Windows에서 VS Code 터미널 실행 팁
+- **프로젝트 루트 폴더**(`...\counsel`)에서 `scripts\run.bat` 를 실행하세요.
+- 경로 인식 오류가 나면 아래처럼 현재 위치를 먼저 확인하세요.
+```bat
+cd
+dir
+```
+- PowerShell에서 실행 중이면 아래처럼 호출해도 됩니다.
+```powershell
+cmd /c scripts\run.bat
+```
+
 ## 수동 실행 방법
 ```bash
 python3 -m venv .venv

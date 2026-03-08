@@ -619,6 +619,87 @@ def create_app() -> Flask:
             grade_class_map=grade_class_map,
         )
 
+    @app.route("/logs/<int:log_id>/edit", methods=["GET", "POST"])
+    def edit_log(log_id: int) -> str:
+        log_row = query_db(
+            """
+            SELECT id, student_id, date, type, summary, detail, action_plan, next_date
+            FROM counsel_logs
+            WHERE id = ?
+            """,
+            (log_id,),
+            one=True,
+        )
+        if log_row is None:
+            flash("상담일지를 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        student_rows = query_db(
+            "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"
+        )
+        grades, grade_class_map = get_grade_class_filters(student_rows)
+
+        if request.method == "POST":
+            student_id = request.form.get("student_id", "").strip()
+            log_date = request.form.get("date", "").strip()
+            log_type = request.form.get("type", "").strip()
+            summary = request.form.get("summary", "").strip()
+            detail = request.form.get("detail", "").strip()
+            action_plan = request.form.get("action_plan", "").strip()
+            next_date = request.form.get("next_date", "").strip()
+
+            if not student_id or not log_date or not log_type or not summary:
+                flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
+            else:
+                execute_db(
+                    """
+                    UPDATE counsel_logs
+                    SET student_id = ?, date = ?, type = ?, summary = ?, detail = ?, action_plan = ?, next_date = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        student_id,
+                        log_date,
+                        log_type,
+                        summary,
+                        detail,
+                        action_plan,
+                        next_date or None,
+                        log_id,
+                    ),
+                )
+                flash("상담일지를 수정했습니다.")
+                return redirect(url_for("student_detail", student_id=student_id))
+
+        attachments = query_db(
+            "SELECT id, file_path, original_name FROM attachments WHERE log_id = ? ORDER BY id",
+            (log_id,),
+        )
+        return render_template(
+            "edit_log.html",
+            log=log_row,
+            attachments=attachments,
+            students=student_rows,
+            grades=grades,
+            grade_class_map=grade_class_map,
+        )
+
+    @app.route("/logs/<int:log_id>/delete", methods=["POST"])
+    def delete_log(log_id: int) -> str:
+        log_row = query_db("SELECT id, student_id FROM counsel_logs WHERE id = ?", (log_id,), one=True)
+        if log_row is None:
+            flash("상담일지를 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        files = query_db("SELECT file_path FROM attachments WHERE log_id = ?", (log_id,))
+        for file_row in files:
+            (UPLOAD_DIR / file_row["file_path"]).unlink(missing_ok=True)
+
+        execute_db("DELETE FROM attachments WHERE log_id = ?", (log_id,))
+        execute_db("DELETE FROM counsel_logs WHERE id = ?", (log_id,))
+        flash("상담일지를 삭제했습니다.")
+        return redirect(url_for("student_detail", student_id=log_row["student_id"]))
+
     @app.route("/students/<int:student_id>/print")
     def student_print(student_id: int) -> str:
         student = query_db(

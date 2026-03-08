@@ -122,6 +122,49 @@ def create_app() -> Flask:
     def download_backup(filename: str):
         return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
 
+    @app.route("/stats")
+    def stats() -> str:
+        selected_year = request.args.get("year", str(datetime.now().year)).strip()
+        if not selected_year.isdigit():
+            selected_year = str(datetime.now().year)
+
+        monthly_rows = query_db(
+            """
+            SELECT substr(date, 1, 7) AS month, COUNT(*) AS count
+            FROM counsel_logs
+            WHERE substr(date, 1, 4) = ?
+            GROUP BY substr(date, 1, 7)
+            ORDER BY month
+            """,
+            (selected_year,),
+        )
+        monthly_map = {row["month"]: row["count"] for row in monthly_rows}
+        monthly_stats = []
+        for month in range(1, 13):
+            key = f"{selected_year}-{month:02d}"
+            monthly_stats.append({"month": key, "count": monthly_map.get(key, 0)})
+
+        yearly_stats = query_db(
+            """
+            SELECT substr(date, 1, 4) AS year, COUNT(*) AS count
+            FROM counsel_logs
+            GROUP BY substr(date, 1, 4)
+            ORDER BY year DESC
+            """
+        )
+
+        total_count = query_db("SELECT COUNT(*) AS count FROM counsel_logs", one=True)["count"]
+        selected_year_count = sum(row["count"] for row in monthly_stats)
+
+        return render_template(
+            "stats.html",
+            selected_year=selected_year,
+            monthly_stats=monthly_stats,
+            yearly_stats=yearly_stats,
+            total_count=total_count,
+            selected_year_count=selected_year_count,
+        )
+
     @app.route("/schedule", methods=["GET", "POST"])
     def schedule() -> str:
         requested_date = request.args.get("date", "").strip()

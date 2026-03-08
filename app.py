@@ -19,14 +19,31 @@ from flask import (
 )
 from werkzeug.utils import secure_filename
 
-BASE_DIR = Path(__file__).parent.resolve()
-DB_PATH = BASE_DIR / "data" / "counsel.db"
-UPLOAD_DIR = BASE_DIR / "data" / "uploads"
+BASE_DIR = Path(__file__).resolve().parent
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
 
 
+def find_project_root(start_dir: Path) -> Path:
+    """Find the nearest parent that contains templates/static folders."""
+    for candidate in [start_dir, *start_dir.parents]:
+        if (candidate / "templates").is_dir() and (candidate / "static").is_dir():
+            return candidate
+    return start_dir
+
+
+PROJECT_ROOT = find_project_root(BASE_DIR)
+DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
+UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
+TEMPLATE_DIR = PROJECT_ROOT / "templates"
+STATIC_DIR = PROJECT_ROOT / "static"
+
+
 def create_app() -> Flask:
-    app = Flask(__name__)
+    app = Flask(
+        __name__,
+        template_folder=str(TEMPLATE_DIR),
+        static_folder=str(STATIC_DIR),
+    )
     app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)

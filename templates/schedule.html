@@ -4,11 +4,24 @@
   <h2>{% if edit_schedule %}상담 일정 수정{% else %}상담 일정 등록{% endif %}</h2>
   <form method="post" class="grid-form">
     <input type="hidden" name="edit_id" value="{{ edit_schedule.id if edit_schedule else '' }}">
-    <label>학생
-      <select name="student_id">
+    <label>학년
+      <select id="schedule-grade-filter">
+        <option value="">전체</option>
+        {% for grade in grades %}
+        <option value="{{ grade }}">{{ grade }}학년</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>반
+      <select id="schedule-class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+    <label class="full">학생
+      <select name="student_id" id="schedule-student-select">
         <option value="">미지정</option>
         {% for s in students %}
-        <option value="{{ s.id }}" {% if edit_schedule and edit_schedule.student_id == s.id %}selected{% endif %}>{{ s.class_name }} {{ s.name }} ({{ s.student_no }})</option>
+        <option value="{{ s.id }}" data-grade="{{ s.grade or '' }}" data-class="{{ s.class_no or '' }}" {% if edit_schedule and edit_schedule.student_id == s.id %}selected{% endif %}>{{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})</option>
         {% endfor %}
       </select>
     </label>
@@ -120,4 +133,46 @@
     </tbody>
   </table>
 </section>
+
+<script>
+  const scheduleGradeClassMap = {{ grade_class_map | tojson }};
+  const sg = document.getElementById('schedule-grade-filter');
+  const sc = document.getElementById('schedule-class-filter');
+  const ss = document.getElementById('schedule-student-select');
+
+  function fillScheduleClassOptions() {
+    const grade = sg.value;
+    const classes = grade ? (scheduleGradeClassMap[grade] || []) : [];
+    const prev = sc.value;
+    sc.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      sc.appendChild(opt);
+    });
+    if (classes.includes(prev)) sc.value = prev;
+  }
+
+  function filterScheduleStudents() {
+    const grade = sg.value;
+    const klass = sc.value;
+    [...ss.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+    });
+    if (ss.selectedOptions[0]?.hidden) ss.value = '';
+  }
+
+  sg.addEventListener('change', () => {
+    fillScheduleClassOptions();
+    filterScheduleStudents();
+  });
+  sc.addEventListener('change', filterScheduleStudents);
+
+  fillScheduleClassOptions();
+  filterScheduleStudents();
+</script>
 {% endblock %}

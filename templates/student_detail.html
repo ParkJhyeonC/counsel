@@ -2,7 +2,7 @@
 {% block content %}
 <section class="card">
   <h2>{{ student.name }} ({{ student.student_no }}) 상담 이력</h2>
-  <p>반: {{ student.class_name }} | 연락처: {{ student.phone }} | 보호자: {{ student.guardian_phone }}</p>
+  <p>학년/반: {{ student.grade or '-' }}학년 {{ student.class_no or student.class_name or '-' }}반 | 담임: {{ student.homeroom_teacher or '-' }} | 연락처: {{ student.phone }} | 보호자: {{ student.guardian_phone }}</p>
   <p>비고: {{ student.note }}</p>
 
   <form method="get" action="{{ url_for('student_print', student_id=student.id) }}" class="search-form">

@@ -7,14 +7,36 @@
   {% endif %}
   <form method="post" enctype="multipart/form-data" class="grid-form" id="log-form">
     <input type="hidden" name="schedule_id" value="{{ prefill_schedule.id if prefill_schedule else '' }}">
-    <label>학생
-      <select name="student_id" required>
-        <option value="">선택하세요</option>
-        {% for s in students %}
-        <option value="{{ s.id }}" {% if prefill_schedule and prefill_schedule.student_id == s.id %}selected{% endif %}>{{ s.class_name }} {{ s.name }} ({{ s.student_no }})</option>
+
+    <label>학년
+      <select id="grade-filter">
+        <option value="">전체</option>
+        {% for grade in grades %}
+        <option value="{{ grade }}" {% if prefill_schedule and prefill_schedule.grade == grade %}selected{% endif %}>{{ grade }}학년</option>
         {% endfor %}
       </select>
     </label>
+    <label>반
+      <select id="class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+
+    <label class="full">학생
+      <select name="student_id" id="student-select" required>
+        <option value="">선택하세요</option>
+        {% for s in students %}
+        <option
+          value="{{ s.id }}"
+          data-grade="{{ s.grade or '' }}"
+          data-class="{{ s.class_no or '' }}"
+          {% if prefill_schedule and prefill_schedule.student_id == s.id %}selected{% endif %}>
+          {{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+
     <label>상담일 <input type="date" name="date" value="{{ prefill_schedule.schedule_date if prefill_schedule else '' }}" required></label>
     <label>상담유형
       <select name="type" required>
@@ -29,4 +51,46 @@
     <button class="btn" type="submit">상담일지 저장</button>
   </form>
 </section>
+
+<script>
+  const gradeClassMap = {{ grade_class_map | tojson }};
+  const gradeFilter = document.getElementById('grade-filter');
+  const classFilter = document.getElementById('class-filter');
+  const studentSelect = document.getElementById('student-select');
+
+  function fillClassOptions() {
+    const grade = gradeFilter.value;
+    const classes = grade ? (gradeClassMap[grade] || []) : [];
+    const prev = classFilter.value;
+    classFilter.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      classFilter.appendChild(opt);
+    });
+    if (classes.includes(prev)) classFilter.value = prev;
+  }
+
+  function filterStudents() {
+    const grade = gradeFilter.value;
+    const klass = classFilter.value;
+    [...studentSelect.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+    });
+    if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+  }
+
+  gradeFilter.addEventListener('change', () => {
+    fillClassOptions();
+    filterStudents();
+  });
+  classFilter.addEventListener('change', filterStudents);
+
+  fillClassOptions();
+  filterStudents();
+</script>
 {% endblock %}

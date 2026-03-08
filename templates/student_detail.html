@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>{{ student.name }} ({{ student.student_no }}) 상담 이력</h2>
+  <p>반: {{ student.class_name }} | 연락처: {{ student.phone }} | 보호자: {{ student.guardian_phone }}</p>
+  <p>비고: {{ student.note }}</p>
+</section>
+
+{% for item in logs %}
+<section class="card log-card">
+  <h3>{{ item.log.date }} - {{ item.log.type }}</h3>
+  <p><strong>요약:</strong> {{ item.log.summary }}</p>
+  <p><strong>상세:</strong> {{ item.log.detail }}</p>
+  <p><strong>조치/계획:</strong> {{ item.log.action_plan }}</p>
+  <p><strong>다음 상담일:</strong> {{ item.log.next_date }}</p>
+  {% if item.files %}
+  <p><strong>첨부:</strong>
+    {% for f in item.files %}
+      <a href="{{ url_for('uploaded_file', filename=f.file_path) }}">{{ f.original_name }}</a>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+</section>
+{% else %}
+<section class="card"><p>상담 이력이 없습니다.</p></section>
+{% endfor %}
+{% endblock %}

@@ -4,7 +4,8 @@ import os
 import sqlite3
 import uuid
 import zipfile
-from datetime import datetime
+from calendar import Calendar, monthrange
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -117,7 +118,31 @@ def create_app() -> Flask:
 
     @app.route("/schedule", methods=["GET", "POST"])
     def schedule() -> str:
-        selected_date = request.args.get("date", datetime.now().date().isoformat())
+        requested_date = request.args.get("date", "").strip()
+        try:
+            selected_date_obj = date.fromisoformat(requested_date) if requested_date else datetime.now().date()
+        except ValueError:
+            selected_date_obj = datetime.now().date()
+        selected_date = selected_date_obj.isoformat()
+
+        month_param = request.args.get("month", "").strip()
+        try:
+            if month_param:
+                year, month = month_param.split("-")
+                calendar_year = int(year)
+                calendar_month = int(month)
+            else:
+                calendar_year = selected_date_obj.year
+                calendar_month = selected_date_obj.month
+        except ValueError:
+            calendar_year = selected_date_obj.year
+            calendar_month = selected_date_obj.month
+
+        first_day_of_month = date(calendar_year, calendar_month, 1)
+        last_day_of_month = date(calendar_year, calendar_month, monthrange(calendar_year, calendar_month)[1])
+        prev_month = date(calendar_year - 1, 12, 1) if calendar_month == 1 else date(calendar_year, calendar_month - 1, 1)
+        next_month = date(calendar_year + 1, 1, 1) if calendar_month == 12 else date(calendar_year, calendar_month + 1, 1)
+
         student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
 
         if request.method == "POST":
@@ -145,7 +170,7 @@ def create_app() -> Flask:
                     ),
                 )
                 flash("상담 일정이 등록되었습니다.")
-                return redirect(url_for("schedule", date=schedule_date))
+                return redirect(url_for("schedule", date=schedule_date, month=schedule_date[:7]))
 
         schedules_for_date = query_db(
             """
@@ -159,18 +184,44 @@ def create_app() -> Flask:
             (selected_date,),
         )
 
-        month_prefix = selected_date[:7]
         month_rows = query_db(
             """
-            SELECT schedule_date, COUNT(*) AS count
-            FROM counsel_schedules
-            WHERE schedule_date LIKE ?
-            GROUP BY schedule_date
-            ORDER BY schedule_date
+            SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.status,
+                   s.name AS student_name
+            FROM counsel_schedules c
+            LEFT JOIN students s ON s.id = c.student_id
+            WHERE c.schedule_date BETWEEN ? AND ?
+            ORDER BY c.schedule_date ASC, c.schedule_time ASC, c.id ASC
             """,
-            (f"{month_prefix}%",),
+            (first_day_of_month.isoformat(), last_day_of_month.isoformat()),
         )
-        month_counts = {row["schedule_date"]: row["count"] for row in month_rows}
+
+        month_counts: dict[str, int] = {}
+        schedules_by_date: dict[str, list[dict[str, Any]]] = {}
+        for row in month_rows:
+            day_key = row["schedule_date"]
+            month_counts[day_key] = month_counts.get(day_key, 0) + 1
+            schedules_by_date.setdefault(day_key, []).append(dict(row))
+
+        cal = Calendar(firstweekday=0)
+        calendar_weeks: list[list[dict[str, Any]]] = []
+        for week_dates in cal.monthdatescalendar(calendar_year, calendar_month):
+            week_items: list[dict[str, Any]] = []
+            for day_obj in week_dates:
+                day_key = day_obj.isoformat()
+                day_schedules = schedules_by_date.get(day_key, [])
+                week_items.append(
+                    {
+                        "date": day_key,
+                        "day": day_obj.day,
+                        "is_current_month": day_obj.month == calendar_month,
+                        "is_selected": day_key == selected_date,
+                        "is_today": day_key == datetime.now().date().isoformat(),
+                        "schedules": day_schedules[:3],
+                        "extra_count": max(0, len(day_schedules) - 3),
+                    }
+                )
+            calendar_weeks.append(week_items)
 
         upcoming_schedules = query_db(
             """
@@ -189,6 +240,11 @@ def create_app() -> Flask:
             "schedule.html",
             students=student_rows,
             selected_date=selected_date,
+            selected_month=first_day_of_month.strftime("%Y-%m"),
+            month_title=first_day_of_month.strftime("%Y년 %m월"),
+            prev_month=prev_month.strftime("%Y-%m"),
+            next_month=next_month.strftime("%Y-%m"),
+            calendar_weeks=calendar_weeks,
             schedules_for_date=schedules_for_date,
             month_counts=month_counts,
             upcoming_schedules=upcoming_schedules,
@@ -205,7 +261,8 @@ def create_app() -> Flask:
             (schedule_id,),
         )
         flash("상담 일정이 완료 처리되었습니다.")
-        return redirect(url_for("schedule", date=request.form.get("date", datetime.now().date().isoformat())))
+        selected_date = request.form.get("date", datetime.now().date().isoformat())
+        return redirect(url_for("schedule", date=selected_date, month=selected_date[:7]))
 
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:

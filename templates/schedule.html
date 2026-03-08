@@ -20,18 +20,33 @@
 </section>
 
 <section class="card">
-  <h2>달력 위젯 (월간 일정 카운트)</h2>
-  <form method="get" class="search-form">
-    <input type="date" name="date" value="{{ selected_date }}">
-    <button class="btn" type="submit">날짜 이동</button>
-  </form>
-  <div class="calendar-counts">
-    {% for day, count in month_counts.items() %}
-      <span class="day-chip {% if day == selected_date %}selected{% endif %}">
-        {{ day[8:] }}일 ({{ count }})
-      </span>
-    {% else %}
-      <p>선택한 달에 등록된 일정이 없습니다.</p>
+  <div class="calendar-header">
+    <h2>월간 상담 달력</h2>
+    <div class="calendar-nav">
+      <a class="btn" href="{{ url_for('schedule', month=prev_month, date=prev_month ~ '-01') }}">◀ 이전달</a>
+      <strong>{{ month_title }}</strong>
+      <a class="btn" href="{{ url_for('schedule', month=next_month, date=next_month ~ '-01') }}">다음달 ▶</a>
+    </div>
+  </div>
+
+  <div class="month-grid">
+    <div class="week-label">월</div><div class="week-label">화</div><div class="week-label">수</div>
+    <div class="week-label">목</div><div class="week-label">금</div><div class="week-label">토</div><div class="week-label">일</div>
+
+    {% for week in calendar_weeks %}
+      {% for day in week %}
+      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %}">
+        <a class="day-number" href="{{ url_for('schedule', month=selected_month, date=day.date) }}">{{ day.day }}</a>
+        {% for item in day.schedules %}
+          <div class="event-chip {{ item.status }}">
+            {{ item.schedule_time or '시간미정' }} {{ item.title }}
+          </div>
+        {% endfor %}
+        {% if day.extra_count > 0 %}
+          <div class="more-chip">+{{ day.extra_count }}건 더 있음</div>
+        {% endif %}
+      </div>
+      {% endfor %}
     {% endfor %}
   </div>
 </section>

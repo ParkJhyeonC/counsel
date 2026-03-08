@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>학생 상담요약 출력</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; color:#222; }
+    h1 { margin-bottom: 6px; }
+    .meta { color:#555; margin-bottom: 14px; }
+    .toolbar { margin-bottom: 14px; }
+    .toolbar button, .toolbar a { margin-right: 8px; }
+    .log { border:1px solid #ddd; border-radius:8px; padding:10px; margin-bottom:10px; }
+    .label { font-weight:700; }
+    @media print {
+      .toolbar { display:none; }
+      body { margin: 0; }
+      .log { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="{{ url_for('student_detail', student_id=student.id) }}">상세페이지로 돌아가기</a>
+  </div>
+
+  <h1>{{ student.name }} ({{ student.student_no }}) 상담요약</h1>
+  <div class="meta">
+    반: {{ student.class_name }} / 출력시각: {{ printed_at }}
+    {% if date_from or date_to %}
+    / 조회기간: {{ date_from or '시작-무관' }} ~ {{ date_to or '종료-무관' }}
+    {% endif %}
+  </div>
+
+  {% for row in logs %}
+  <section class="log">
+    <div><span class="label">상담일:</span> {{ row.date }} / <span class="label">유형:</span> {{ row.type }}</div>
+    <div><span class="label">요약:</span> {{ row.summary }}</div>
+    <div><span class="label">상세:</span> {{ row.detail }}</div>
+    <div><span class="label">조치/계획:</span> {{ row.action_plan }}</div>
+    <div><span class="label">다음 상담일:</span> {{ row.next_date }}</div>
+  </section>
+  {% else %}
+  <p>조건에 해당하는 상담 이력이 없습니다.</p>
+  {% endfor %}
+</body>
+</html>

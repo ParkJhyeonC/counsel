@@ -378,6 +378,47 @@ def create_app() -> Flask:
 
         return render_template("new_log.html", students=student_rows)
 
+    @app.route("/students/<int:student_id>/print")
+    def student_print(student_id: int) -> str:
+        student = query_db(
+            "SELECT id, student_no, name, class_name, phone, guardian_phone, note FROM students WHERE id = ?",
+            (student_id,),
+            one=True,
+        )
+        if student is None:
+            flash("학생을 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        date_from = request.args.get("date_from", "").strip()
+        date_to = request.args.get("date_to", "").strip()
+
+        query = (
+            """
+            SELECT id, date, type, summary, detail, action_plan, next_date, created_at
+            FROM counsel_logs
+            WHERE student_id = ?
+            """
+        )
+        params: list[Any] = [student_id]
+        if date_from:
+            query += " AND date >= ?"
+            params.append(date_from)
+        if date_to:
+            query += " AND date <= ?"
+            params.append(date_to)
+
+        query += " ORDER BY date DESC, created_at DESC"
+        logs = query_db(query, tuple(params))
+
+        return render_template(
+            "student_print.html",
+            student=student,
+            logs=logs,
+            date_from=date_from,
+            date_to=date_to,
+            printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+
     @app.route("/students/<int:student_id>")
     def student_detail(student_id: int) -> str:
         student = query_db(

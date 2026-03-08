@@ -30,6 +30,27 @@
 </section>
 
 <section class="card">
+  <h2>자동 백업 관리</h2>
+  <p>앱 실행 시 하루 1회 자동 백업이 생성되며, 아래 버튼으로 수동 백업도 생성할 수 있습니다.</p>
+  <form method="post" action="{{ url_for('create_backup') }}">
+    <button class="btn" type="submit">지금 백업 생성</button>
+  </form>
+  <table>
+    <thead><tr><th>파일명</th><th>다운로드</th></tr></thead>
+    <tbody>
+      {% for backup in backup_files %}
+      <tr>
+        <td>{{ backup.name }}</td>
+        <td><a href="{{ url_for('download_backup', filename=backup.name) }}">다운로드</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2">생성된 백업 파일이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
   <h2>최근 상담일지</h2>
   <table>
     <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th></tr></thead>

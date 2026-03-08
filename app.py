@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,8 @@ TEMPLATE_DIR = PROJECT_ROOT / "templates"
 STATIC_DIR = PROJECT_ROOT / "static"
 DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
+BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
+MAX_BACKUP_FILES = 20
 
 
 def validate_project_layout() -> None:
@@ -56,6 +59,7 @@ def create_app() -> Flask:
 
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
     @app.before_request
     def before_request() -> None:
@@ -92,12 +96,24 @@ def create_app() -> Flask:
             """,
             (datetime.now().date().isoformat(),),
         )
+        backup_files = list_backup_files()
         return render_template(
             "index.html",
             students=students,
             latest_logs=latest_logs,
             upcoming_schedules=upcoming_schedules,
+            backup_files=backup_files,
         )
+
+    @app.route("/backup/create", methods=["POST"])
+    def create_backup() -> str:
+        backup_name = create_backup_archive(trigger="manual")
+        flash(f"백업 파일을 생성했습니다: {backup_name}")
+        return redirect(url_for("index"))
+
+    @app.route("/backup/download/<path:filename>")
+    def download_backup(filename: str):
+        return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
 
     @app.route("/schedule", methods=["GET", "POST"])
     def schedule() -> str:
@@ -395,9 +411,75 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(student_id) REFERENCES students(id)
             );
+
+            CREATE TABLE IF NOT EXISTS app_settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
             """
         )
     conn.close()
+
+
+def list_backup_files() -> list[Path]:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    return sorted(BACKUP_DIR.glob("counsel_backup_*.zip"), reverse=True)
+
+
+def prune_old_backups() -> None:
+    backups = list_backup_files()
+    for old_file in backups[MAX_BACKUP_FILES:]:
+        old_file.unlink(missing_ok=True)
+
+
+def create_backup_archive(trigger: str = "auto") -> str:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_name = f"counsel_backup_{timestamp}_{trigger}.zip"
+    backup_path = BACKUP_DIR / backup_name
+
+    with zipfile.ZipFile(backup_path, "w", compression=zipfile.ZIP_DEFLATED) as zip_file:
+        if DB_PATH.exists():
+            zip_file.write(DB_PATH, arcname="counsel.db")
+        if UPLOAD_DIR.exists():
+            for file_path in UPLOAD_DIR.rglob("*"):
+                if file_path.is_file():
+                    arcname = Path("uploads") / file_path.relative_to(UPLOAD_DIR)
+                    zip_file.write(file_path, arcname=str(arcname))
+
+    prune_old_backups()
+    return backup_name
+
+
+def ensure_daily_auto_backup() -> str | None:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+        """
+    )
+    today = datetime.now().date().isoformat()
+    row = conn.execute("SELECT value FROM app_settings WHERE key = 'last_auto_backup_date'").fetchone()
+    if row and row["value"] == today:
+        conn.close()
+        return None
+
+    backup_name = create_backup_archive(trigger="auto")
+    conn.execute(
+        """
+        INSERT INTO app_settings(key, value)
+        VALUES ('last_auto_backup_date', ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (today,),
+    )
+    conn.commit()
+    conn.close()
+    return backup_name
 
 
 def query_db(query: str, params: tuple[Any, ...] = (), one: bool = False):
@@ -423,4 +505,7 @@ app = create_app()
 
 if __name__ == "__main__":
     init_db()
+    auto_backup = ensure_daily_auto_backup()
+    if auto_backup:
+        print(f"[INFO] 자동 백업 생성: {auto_backup}")
     app.run(host="0.0.0.0", port=5000, debug=True)

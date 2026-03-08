@@ -31,6 +31,20 @@ call "%VENV_DIR%\Scripts\activate.bat"
 if errorlevel 1 exit /b 1
 
 cd /d "%ROOT_DIR%"
+if not exist "%ROOT_DIR%\app.py" (
+  echo [ERROR] "%ROOT_DIR%\app.py" not found. 압축을 푼 프로젝트 루트 폴더에서 실행해 주세요.
+  exit /b 1
+)
+if not exist "%ROOT_DIR%\templates\index.html" (
+  echo [ERROR] "%ROOT_DIR%\templates\index.html" not found. templates 폴더 구조를 확인하세요.
+  exit /b 1
+)
+if not exist "%ROOT_DIR%\static\style.css" (
+  echo [ERROR] "%ROOT_DIR%\static\style.css" not found. static 폴더 구조를 확인하세요.
+  exit /b 1
+)
+
+echo [INFO] Using project root: "%ROOT_DIR%"
 if errorlevel 1 (
   echo [ERROR] Failed to change directory to "%ROOT_DIR%".
   exit /b 1

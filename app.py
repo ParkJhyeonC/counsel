@@ -137,7 +137,7 @@ def create_app() -> Flask:
         if not summary and not detail and not action_plan:
             return jsonify({"ok": False, "error": "사례개념화를 생성할 상담 내용이 없습니다."}), 400
 
-        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        api_key = get_configured_openai_api_key()
         if not api_key:
             return jsonify({"ok": False, "error": "OPENAI_API_KEY가 설정되지 않았습니다."}), 503
 
@@ -166,6 +166,44 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "result": result_text})
         except RuntimeError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 502
+
+
+    @app.route("/settings/ai", methods=["GET", "POST"])
+    def ai_settings() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "save").strip()
+            if action == "clear":
+                execute_db("DELETE FROM app_settings WHERE key = ?", ("openai_api_key",))
+                flash("OpenAI API 키를 삭제했습니다.")
+            else:
+                api_key = request.form.get("api_key", "").strip()
+                if not api_key:
+                    flash("API 키를 입력해주세요.")
+                    return redirect(url_for("ai_settings"))
+
+                execute_db(
+                    """
+                    INSERT INTO app_settings(key, value)
+                    VALUES (?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                    """,
+                    ("openai_api_key", api_key),
+                )
+                flash("OpenAI API 키를 저장했습니다.")
+            return redirect(url_for("ai_settings"))
+
+        row = query_db("SELECT value FROM app_settings WHERE key = ?", ("openai_api_key",), one=True)
+        stored_key = (row["value"] if row else "").strip()
+        key_masked = f"{'*' * max(len(stored_key) - 4, 0)}{stored_key[-4:]}" if stored_key else ""
+        has_env_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+        active_source = "웹앱 저장값" if stored_key else ("환경변수" if has_env_key else "없음")
+        return render_template(
+            "settings_ai.html",
+            has_stored_key=bool(stored_key),
+            key_masked=key_masked,
+            has_env_key=has_env_key,
+            active_source=active_source,
+        )
 
     @app.route("/stats")
     def stats() -> str:
@@ -754,6 +792,13 @@ def anonymize_text_for_ai(text: str) -> str:
     masked = re.sub(r"[가-힣]{2,4}(?=\s?(학생|군|양|님))", "[학생]", masked)
     return masked
 
+
+
+def get_configured_openai_api_key() -> str:
+    row = query_db("SELECT value FROM app_settings WHERE key = ?", ("openai_api_key",), one=True)
+    if row and row["value"].strip():
+        return row["value"].strip()
+    return os.environ.get("OPENAI_API_KEY", "").strip()
 
 def request_openai_case_conceptualization(api_key: str, system_prompt: str, user_prompt: str) -> str:
     model = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")

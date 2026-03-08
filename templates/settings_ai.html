@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>AI 설정</h2>
+  <p class="muted">웹앱에서 OpenAI API 키를 저장하면 상담일지 작성 화면의 사례개념화 보조 기능에서 사용됩니다.</p>
+
+  <table>
+    <tr><th>현재 활성 키 소스</th><td>{{ active_source }}</td></tr>
+    <tr><th>웹앱 저장 키</th><td>{% if has_stored_key %}저장됨 ({{ key_masked }}){% else %}없음{% endif %}</td></tr>
+    <tr><th>환경변수 키(OPENAI_API_KEY)</th><td>{% if has_env_key %}감지됨{% else %}없음{% endif %}</td></tr>
+  </table>
+</section>
+
+<section class="card">
+  <h2>OpenAI API 키 등록/수정</h2>
+  <form method="post" class="grid-form">
+    <label class="full">API 키
+      <input type="password" name="api_key" placeholder="sk-..." autocomplete="off">
+    </label>
+    <button class="btn" type="submit" name="action" value="save">저장</button>
+    <button class="btn" type="submit" name="action" value="clear">저장 키 삭제</button>
+  </form>
+  <p class="muted">주의: 키는 로컬 DB(app_settings 테이블)에 평문으로 저장됩니다. 개인 PC에서만 사용하세요.</p>
+</section>
+{% endblock %}

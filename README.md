@@ -2,22 +2,52 @@
 
 로컬 드라이브(PC)에서 실행하는 **상담일지 저장 및 관리 웹앱**입니다.
 
-## 기능
+## 주요 기능
 - 학생 등록/검색
 - 상담일지 작성(유형, 내용, 조치/추후계획)
 - 학생별 상담이력 조회
 - 첨부파일 로컬 저장(`data/uploads`)
 - SQLite 로컬 DB 저장(`data/counsel.db`)
 
-## 실행 방법
+---
+
+## 가장 쉬운 실행 방법
+
+### macOS / Linux
 ```bash
-python -m venv .venv
-source .venv/bin/activate
+./scripts/run.sh
+```
+
+### Windows
+```bat
+scripts\run.bat
+```
+
+위 스크립트가 자동으로 아래를 처리합니다.
+1. 가상환경 생성 (`.venv`)
+2. 의존성 설치
+3. DB 초기화 확인
+4. 서버 실행 (`http://localhost:5000`)
+
+---
+
+## 수동 실행 방법
+```bash
+python3 -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 python app.py
 ```
 
-브라우저에서 `http://localhost:5000` 접속
+---
+
+## 개발 편의 명령(Makefile)
+```bash
+make setup   # venv + 의존성 설치
+make run     # DB 확인 후 실행
+```
+
+---
 
 ## 참고
 - 첫 실행 시 DB 테이블이 자동 생성됩니다.

@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 import uuid
 import zipfile
+from urllib import error as url_error
+from urllib import request as url_request
+import json
 from calendar import Calendar, monthrange
 from datetime import date, datetime
 from pathlib import Path
@@ -13,6 +17,7 @@ from flask import (
     Flask,
     flash,
     g,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -121,6 +126,46 @@ def create_app() -> Flask:
     @app.route("/backup/download/<path:filename>")
     def download_backup(filename: str):
         return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+    @app.route("/ai/case-conceptualization", methods=["POST"])
+    def ai_case_conceptualization():
+        payload = request.get_json(silent=True) or {}
+        summary = payload.get("summary", "").strip()
+        detail = payload.get("detail", "").strip()
+        action_plan = payload.get("action_plan", "").strip()
+
+        if not summary and not detail and not action_plan:
+            return jsonify({"ok": False, "error": "사례개념화를 생성할 상담 내용이 없습니다."}), 400
+
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip()
+        if not api_key:
+            return jsonify({"ok": False, "error": "OPENAI_API_KEY가 설정되지 않았습니다."}), 503
+
+        clean_summary = anonymize_text_for_ai(summary)
+        clean_detail = anonymize_text_for_ai(detail)
+        clean_action_plan = anonymize_text_for_ai(action_plan)
+
+        system_prompt = (
+            "당신은 한국 고등학교 상담교사를 돕는 상담 수퍼바이저다. "
+            "아래 내용을 바탕으로 사례개념화 초안을 한국어로 작성하라. "
+            "출력은 반드시 다음 항목 순서를 지켜라: "
+            "1) 핵심문제 2) 유지요인(개인/가정/학교/또래) 3) 보호요인 4) 개입가설 5) 다음회기 질문(3개) 6) 단기개입계획(1~2주)."
+        )
+        user_prompt = (
+            f"[상담요약]\n{clean_summary}\n\n"
+            f"[상담내용]\n{clean_detail}\n\n"
+            f"[조치사항/계획]\n{clean_action_plan}\n"
+        )
+
+        try:
+            result_text = request_openai_case_conceptualization(
+                api_key=api_key,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+            return jsonify({"ok": True, "result": result_text})
+        except RuntimeError as exc:
+            return jsonify({"ok": False, "error": str(exc)}), 502
 
     @app.route("/stats")
     def stats() -> str:
@@ -700,6 +745,46 @@ def ensure_daily_auto_backup() -> str | None:
     conn.commit()
     conn.close()
     return backup_name
+
+
+def anonymize_text_for_ai(text: str) -> str:
+    masked = text
+    masked = re.sub(r"\b\d{4,}\b", "[숫자정보]", masked)
+    masked = re.sub(r"\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}", "[연락처]", masked)
+    masked = re.sub(r"[가-힣]{2,4}(?=\s?(학생|군|양|님))", "[학생]", masked)
+    return masked
+
+
+def request_openai_case_conceptualization(api_key: str, system_prompt: str, user_prompt: str) -> str:
+    model = os.environ.get("OPENAI_MODEL", "gpt-4.1-mini")
+    body = {
+        "model": model,
+        "temperature": 0.4,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
+    }
+    data = json.dumps(body).encode("utf-8")
+    req = url_request.Request(
+        "https://api.openai.com/v1/chat/completions",
+        data=data,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    try:
+        with url_request.urlopen(req, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+            parsed = json.loads(raw)
+            return parsed["choices"][0]["message"]["content"].strip()
+    except url_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"OpenAI API 오류: {detail}") from exc
+    except url_error.URLError as exc:
+        raise RuntimeError("OpenAI API 연결에 실패했습니다. 네트워크를 확인하세요.") from exc
 
 
 def query_db(query: str, params: tuple[Any, ...] = (), one: bool = False):

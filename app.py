@@ -77,6 +77,8 @@ def create_app() -> Flask:
         students = query_db(
             "SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name"
         )
+        students_count = query_db("SELECT COUNT(*) AS count FROM students", one=True)["count"]
+        logs_count = query_db("SELECT COUNT(*) AS count FROM counsel_logs", one=True)["count"]
         latest_logs = query_db(
             """
             SELECT l.id, l.date, l.type, s.name AS student_name, l.summary
@@ -101,9 +103,13 @@ def create_app() -> Flask:
         return render_template(
             "index.html",
             students=students,
+            students_count=students_count,
+            logs_count=logs_count,
             latest_logs=latest_logs,
             upcoming_schedules=upcoming_schedules,
             backup_files=backup_files,
+            upcoming_count=len(upcoming_schedules),
+            backup_count=len(backup_files),
         )
 
     @app.route("/backup/create", methods=["POST"])

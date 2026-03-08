@@ -83,10 +83,7 @@
         <td>{{ row.status }}</td>
         <td>
           {% if row.status == 'planned' %}
-          <form method="post" action="{{ url_for('complete_schedule', schedule_id=row.id) }}">
-            <input type="hidden" name="date" value="{{ selected_date }}">
-            <button type="submit" class="btn">완료</button>
-          </form>
+            <a class="btn" href="{{ url_for('new_log', schedule_id=row.id) }}">상담일지 등록</a>
           {% else %}
             완료
           {% endif %}

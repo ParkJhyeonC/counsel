@@ -4,6 +4,12 @@
   <h2>{{ student.name }} ({{ student.student_no }}) 상담 이력</h2>
   <p>반: {{ student.class_name }} | 연락처: {{ student.phone }} | 보호자: {{ student.guardian_phone }}</p>
   <p>비고: {{ student.note }}</p>
+
+  <form method="get" action="{{ url_for('student_print', student_id=student.id) }}" class="search-form">
+    <label>시작일 <input type="date" name="date_from"></label>
+    <label>종료일 <input type="date" name="date_to"></label>
+    <button class="btn" type="submit">상담요약 인쇄/PDF</button>
+  </form>
 </section>
 
 {% for item in logs %}

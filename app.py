@@ -25,6 +25,7 @@ from flask import (
     url_for,
 )
 from werkzeug.utils import secure_filename
+from openpyxl import load_workbook
 
 BASE_DIR = Path(__file__).resolve().parent
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
@@ -294,7 +295,8 @@ def create_app() -> Flask:
         prev_month = date(calendar_year - 1, 12, 1) if calendar_month == 1 else date(calendar_year, calendar_month - 1, 1)
         next_month = date(calendar_year + 1, 1, 1) if calendar_month == 12 else date(calendar_year, calendar_month + 1, 1)
 
-        student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
+        student_rows = query_db("SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name")
+        grades, grade_class_map = get_grade_class_filters(student_rows)
         edit_schedule_id = request.values.get("edit_id", "").strip()
         edit_schedule = None
         if edit_schedule_id.isdigit():
@@ -363,7 +365,7 @@ def create_app() -> Flask:
         schedules_for_date = query_db(
             """
             SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.note, c.status,
-                   s.id AS student_id, s.name AS student_name, s.class_name
+                   s.id AS student_id, s.name AS student_name, s.grade, s.class_no, s.class_name
             FROM counsel_schedules c
             LEFT JOIN students s ON s.id = c.student_id
             WHERE c.schedule_date = ?
@@ -414,7 +416,7 @@ def create_app() -> Flask:
         upcoming_schedules = query_db(
             """
             SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.status,
-                   s.id AS student_id, s.name AS student_name
+                   s.id AS student_id, s.name AS student_name, s.grade, s.class_no
             FROM counsel_schedules c
             LEFT JOIN students s ON s.id = c.student_id
             WHERE c.status = 'planned' AND c.schedule_date >= ?
@@ -437,58 +439,78 @@ def create_app() -> Flask:
             month_counts=month_counts,
             upcoming_schedules=upcoming_schedules,
             edit_schedule=edit_schedule,
+            grades=grades,
+            grade_class_map=grade_class_map,
         )
 
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:
         if request.method == "POST":
-            student_no = request.form.get("student_no", "").strip()
-            name = request.form.get("name", "").strip()
-            class_name = request.form.get("class_name", "").strip()
-            phone = request.form.get("phone", "").strip()
-            guardian_phone = request.form.get("guardian_phone", "").strip()
-            note = request.form.get("note", "").strip()
-
-            if not student_no or not name:
-                flash("학번과 이름은 필수입니다.")
+            form_action = request.form.get("form_action", "manual").strip()
+            if form_action == "import_excel":
+                excel_file = request.files.get("student_excel")
+                if not excel_file or excel_file.filename == "":
+                    flash("엑셀 파일을 선택해 주세요.")
+                else:
+                    try:
+                        imported, skipped = import_students_from_excel(excel_file.stream)
+                        flash(f"엑셀 일괄등록 완료: {imported}건 반영, {skipped}건 건너뜀")
+                        return redirect(url_for("students"))
+                    except Exception as exc:
+                        flash(f"엑셀 처리 중 오류가 발생했습니다: {exc}")
             else:
-                try:
-                    execute_db(
-                        """
-                        INSERT INTO students(student_no, name, class_name, phone, guardian_phone, note)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                        """,
-                        (student_no, name, class_name, phone, guardian_phone, note),
-                    )
-                    flash("학생 정보가 저장되었습니다.")
-                    return redirect(url_for("students"))
-                except sqlite3.IntegrityError:
-                    flash("이미 등록된 학번입니다.")
+                student_no = request.form.get("student_no", "").strip()
+                name = request.form.get("name", "").strip()
+                grade = request.form.get("grade", "").strip()
+                class_no = request.form.get("class_no", "").strip()
+                class_name = request.form.get("class_name", "").strip() or (f"{grade}-{class_no}" if grade and class_no else "")
+                homeroom_teacher = request.form.get("homeroom_teacher", "").strip()
+                phone = request.form.get("phone", "").strip()
+                guardian_phone = request.form.get("guardian_phone", "").strip()
+                note = request.form.get("note", "").strip()
+
+                if not student_no or not name:
+                    flash("학번과 이름은 필수입니다.")
+                else:
+                    try:
+                        execute_db(
+                            """
+                            INSERT INTO students(student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (student_no, name, grade or None, class_no or None, class_name or None, homeroom_teacher or None, phone, guardian_phone, note),
+                        )
+                        flash("학생 정보가 저장되었습니다.")
+                        return redirect(url_for("students"))
+                    except sqlite3.IntegrityError:
+                        flash("이미 등록된 학번입니다.")
 
         q = request.args.get("q", "").strip()
         if q:
             student_rows = query_db(
                 """
-                SELECT id, student_no, name, class_name, phone, guardian_phone, note
+                SELECT id, student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note
                 FROM students
-                WHERE student_no LIKE ? OR name LIKE ? OR class_name LIKE ?
-                ORDER BY class_name, name
+                WHERE student_no LIKE ? OR name LIKE ? OR class_name LIKE ? OR grade LIKE ? OR class_no LIKE ? OR homeroom_teacher LIKE ?
+                ORDER BY grade, class_no, name
                 """,
-                (f"%{q}%", f"%{q}%", f"%{q}%"),
+                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"),
             )
         else:
             student_rows = query_db(
                 """
-                SELECT id, student_no, name, class_name, phone, guardian_phone, note
+                SELECT id, student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note
                 FROM students
-                ORDER BY class_name, name
+                ORDER BY grade, class_no, name
                 """
             )
-        return render_template("students.html", students=student_rows, q=q)
+        grades, grade_class_map = get_grade_class_filters(student_rows)
+        return render_template("students.html", students=student_rows, q=q, grades=grades, grade_class_map=grade_class_map)
 
     @app.route("/logs/new", methods=["GET", "POST"])
     def new_log() -> str:
-        student_rows = query_db("SELECT id, student_no, name, class_name FROM students ORDER BY class_name, name")
+        student_rows = query_db("SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name")
+        grades, grade_class_map = get_grade_class_filters(student_rows)
         schedule_id = request.values.get("schedule_id", "").strip()
 
         prefill_schedule = None
@@ -496,7 +518,7 @@ def create_app() -> Flask:
             prefill_schedule = query_db(
                 """
                 SELECT c.id, c.schedule_date, c.schedule_time, c.title, c.note, c.status,
-                       s.id AS student_id, s.name AS student_name, s.class_name
+                       s.id AS student_id, s.name AS student_name, s.grade, s.class_no, s.class_name
                 FROM counsel_schedules c
                 LEFT JOIN students s ON s.id = c.student_id
                 WHERE c.id = ?
@@ -593,12 +615,14 @@ def create_app() -> Flask:
             "new_log.html",
             students=student_rows,
             prefill_schedule=prefill_schedule,
+            grades=grades,
+            grade_class_map=grade_class_map,
         )
 
     @app.route("/students/<int:student_id>/print")
     def student_print(student_id: int) -> str:
         student = query_db(
-            "SELECT id, student_no, name, class_name, phone, guardian_phone, note FROM students WHERE id = ?",
+            "SELECT id, student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note FROM students WHERE id = ?",
             (student_id,),
             one=True,
         )
@@ -639,7 +663,7 @@ def create_app() -> Flask:
     @app.route("/students/<int:student_id>")
     def student_detail(student_id: int) -> str:
         student = query_db(
-            "SELECT id, student_no, name, class_name, phone, guardian_phone, note FROM students WHERE id = ?",
+            "SELECT id, student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note FROM students WHERE id = ?",
             (student_id,),
             one=True,
         )
@@ -694,7 +718,10 @@ def init_db() -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 student_no TEXT UNIQUE NOT NULL,
                 name TEXT NOT NULL,
+                grade TEXT,
+                class_no TEXT,
                 class_name TEXT,
+                homeroom_teacher TEXT,
                 phone TEXT,
                 guardian_phone TEXT,
                 note TEXT
@@ -740,7 +767,93 @@ def init_db() -> None:
             );
             """
         )
+        add_column_if_missing(conn, "students", "grade", "TEXT")
+        add_column_if_missing(conn, "students", "class_no", "TEXT")
+        add_column_if_missing(conn, "students", "homeroom_teacher", "TEXT")
     conn.close()
+
+
+
+def add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, col_type: str) -> None:
+    rows = conn.execute(f"PRAGMA table_info({table})").fetchall()
+    existing = {row[1] for row in rows}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
+def parse_grade_class_from_text(text: str) -> tuple[str, str]:
+    match = re.search(r"(\d+)\s*[-반]\s*(\d+)", text)
+    if not match:
+        return "", ""
+    return match.group(1), match.group(2)
+
+
+def parse_homeroom_teacher(ws) -> str:
+    for row in ws.iter_rows(min_row=1, max_row=8, min_col=1, max_col=8, values_only=True):
+        for value in row:
+            if not value:
+                continue
+            text = str(value).strip()
+            match = re.search(r"담임\s*[:：]?\s*([^\s]+)", text)
+            if match:
+                return match.group(1).strip()
+    return ""
+
+
+def import_students_from_excel(file_stream) -> tuple[int, int]:
+    wb = load_workbook(file_stream, data_only=True)
+    inserted_or_updated = 0
+    skipped = 0
+
+    for ws in wb.worksheets:
+        grade, class_no = parse_grade_class_from_text(ws.title)
+        teacher = parse_homeroom_teacher(ws)
+        class_name = f"{grade}-{class_no}" if grade and class_no else ws.title
+
+        for row in ws.iter_rows(min_row=1, max_col=3, values_only=True):
+            raw_no = row[0]
+            raw_name = row[1]
+            if raw_no is None or raw_name is None:
+                continue
+
+            no_text = str(raw_no).strip()
+            name = str(raw_name).strip()
+            if not re.fullmatch(r"\d+", no_text):
+                continue
+            if not re.fullmatch(r"[가-힣A-Za-z]{2,20}", name):
+                continue
+
+            no = int(no_text)
+            student_no = f"{grade or 'X'}{int(class_no) if class_no.isdigit() else 0:02d}{no:02d}"
+
+            execute_db(
+                """
+                INSERT INTO students(student_no, name, grade, class_no, class_name, homeroom_teacher)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(student_no) DO UPDATE SET
+                    name = excluded.name,
+                    grade = excluded.grade,
+                    class_no = excluded.class_no,
+                    class_name = excluded.class_name,
+                    homeroom_teacher = excluded.homeroom_teacher
+                """,
+                (student_no, name, grade or None, class_no or None, class_name, teacher or None),
+            )
+            inserted_or_updated += 1
+
+    return inserted_or_updated, skipped
+
+
+def get_grade_class_filters(student_rows) -> tuple[list[str], dict[str, list[str]]]:
+    grades = sorted({(row["grade"] or "").strip() for row in student_rows if row["grade"]})
+    mapping: dict[str, set[str]] = {g: set() for g in grades}
+    for row in student_rows:
+        grade = (row["grade"] or "").strip()
+        class_no = (row["class_no"] or "").strip()
+        if grade and class_no:
+            mapping.setdefault(grade, set()).add(class_no)
+    class_map = {k: sorted(v, key=lambda x: int(x) if x.isdigit() else x) for k, v in mapping.items()}
+    return grades, class_map
 
 
 def list_backup_files() -> list[Path]:

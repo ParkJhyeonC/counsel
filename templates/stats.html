@@ -16,6 +16,7 @@
   <form method="get" class="search-form">
     <label>연도 <input type="number" min="2000" max="2100" name="year" value="{{ selected_year }}"></label>
     <button class="btn" type="submit">조회</button>
+    <a class="btn btn-secondary" href="{{ url_for('stats_annual_ledger', year=selected_year) }}" target="_blank">개인상담 운영대장 출력</a>
   </form>
 
   <div class="stats-bars">

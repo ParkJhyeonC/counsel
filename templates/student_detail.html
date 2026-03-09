@@ -9,6 +9,7 @@
     <label>시작일 <input type="date" name="date_from"></label>
     <label>종료일 <input type="date" name="date_to"></label>
     <button class="btn" type="submit">상담요약 인쇄/PDF</button>
+    <a class="btn btn-secondary" href="{{ url_for('student_record_form', student_id=student.id) }}" target="_blank">개인 상담 기록부 출력</a>
   </form>
 </section>
 

@@ -47,7 +47,9 @@
     <label>상담일 <input type="date" name="date" value="{{ prefill_schedule.schedule_date if prefill_schedule else '' }}" required></label>
     <label>상담유형
       <select name="type" required>
-        <option>진로</option><option>학업</option><option>정서</option><option>생활지도</option><option>기타</option>
+        {% for ct in counsel_types %}
+        <option value="{{ ct.name }}">{{ ct.name }}</option>
+        {% endfor %}
       </select>
     </label>
     <label class="full">상담요약 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>

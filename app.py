@@ -225,6 +225,50 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "message": str(exc)}), 200
 
 
+    @app.route("/settings/counsel-types", methods=["GET", "POST"])
+    def counsel_types_settings() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "add":
+                name = request.form.get("name", "").strip()
+                if not name:
+                    flash("추가할 상담유형 이름을 입력해 주세요.")
+                else:
+                    try:
+                        execute_db("INSERT INTO counsel_types(name, sort_order) VALUES(?, ?)", (name, get_next_counsel_type_order()))
+                        flash("상담유형을 추가했습니다.")
+                    except sqlite3.IntegrityError:
+                        flash("이미 존재하는 상담유형입니다.")
+            elif action == "update":
+                type_id = request.form.get("type_id", "").strip()
+                name = request.form.get("name", "").strip()
+                if type_id.isdigit() and name:
+                    try:
+                        execute_db("UPDATE counsel_types SET name = ? WHERE id = ?", (name, int(type_id)))
+                        flash("상담유형을 수정했습니다.")
+                    except sqlite3.IntegrityError:
+                        flash("이미 존재하는 상담유형입니다.")
+                else:
+                    flash("수정할 상담유형 정보를 확인해 주세요.")
+            elif action == "delete":
+                type_id = request.form.get("type_id", "").strip()
+                if type_id.isdigit():
+                    row = query_db("SELECT name FROM counsel_types WHERE id = ?", (int(type_id),), one=True)
+                    if row is not None:
+                        used = query_db("SELECT COUNT(*) AS cnt FROM counsel_logs WHERE type = ?", (row["name"],), one=True)
+                        if used and used["cnt"] > 0:
+                            flash("이미 사용된 상담유형은 삭제할 수 없습니다.")
+                        else:
+                            execute_db("DELETE FROM counsel_types WHERE id = ?", (int(type_id),))
+                            flash("상담유형을 삭제했습니다.")
+                else:
+                    flash("삭제할 상담유형을 찾을 수 없습니다.")
+            return redirect(url_for("counsel_types_settings"))
+
+        counsel_types = get_counsel_types()
+        return render_template("counsel_types.html", counsel_types=counsel_types)
+
+
     @app.route("/stats")
     def stats() -> str:
         selected_year = request.args.get("year", str(datetime.now().year)).strip()
@@ -297,6 +341,7 @@ def create_app() -> Flask:
 
         student_rows = query_db("SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name")
         grades, grade_class_map = get_grade_class_filters(student_rows)
+        counsel_types = get_counsel_types()
         edit_schedule_id = request.values.get("edit_id", "").strip()
         edit_schedule = None
         if edit_schedule_id.isdigit():
@@ -512,6 +557,7 @@ def create_app() -> Flask:
         student_rows = query_db("SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name")
         grades, grade_class_map = get_grade_class_filters(student_rows)
         schedule_id = request.values.get("schedule_id", "").strip()
+        counsel_types = get_counsel_types()
 
         prefill_schedule = None
         if schedule_id.isdigit():
@@ -617,6 +663,7 @@ def create_app() -> Flask:
             prefill_schedule=prefill_schedule,
             grades=grades,
             grade_class_map=grade_class_map,
+            counsel_types=counsel_types,
         )
 
     @app.route("/logs/<int:log_id>/edit", methods=["GET", "POST"])
@@ -682,6 +729,7 @@ def create_app() -> Flask:
             students=student_rows,
             grades=grades,
             grade_class_map=grade_class_map,
+            counsel_types=counsel_types,
         )
 
     @app.route("/logs/<int:log_id>/delete", methods=["POST"])
@@ -917,11 +965,18 @@ def init_db() -> None:
                 updated_at TEXT NOT NULL,
                 FOREIGN KEY(student_id) REFERENCES students(id)
             );
+
+            CREATE TABLE IF NOT EXISTS counsel_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                sort_order INTEGER NOT NULL DEFAULT 0
+            );
             """
         )
         add_column_if_missing(conn, "students", "grade", "TEXT")
         add_column_if_missing(conn, "students", "class_no", "TEXT")
         add_column_if_missing(conn, "students", "homeroom_teacher", "TEXT")
+        seed_default_counsel_types(conn)
     conn.close()
 
 
@@ -1006,6 +1061,25 @@ def get_grade_class_filters(student_rows) -> tuple[list[str], dict[str, list[str
             mapping.setdefault(grade, set()).add(class_no)
     class_map = {k: sorted(v, key=lambda x: int(x) if x.isdigit() else x) for k, v in mapping.items()}
     return grades, class_map
+
+
+
+def seed_default_counsel_types(conn: sqlite3.Connection) -> None:
+    count_row = conn.execute("SELECT COUNT(*) FROM counsel_types").fetchone()
+    if count_row and count_row[0] > 0:
+        return
+    defaults = ["진로", "학업", "정서", "생활지도", "기타"]
+    for idx, name in enumerate(defaults, start=1):
+        conn.execute("INSERT INTO counsel_types(name, sort_order) VALUES(?, ?)", (name, idx))
+
+
+def get_counsel_types() -> list[sqlite3.Row]:
+    return query_db("SELECT id, name, sort_order FROM counsel_types ORDER BY sort_order, id")
+
+
+def get_next_counsel_type_order() -> int:
+    row = query_db("SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_order FROM counsel_types", one=True)
+    return row["next_order"] if row else 1
 
 
 def list_backup_files() -> list[Path]:

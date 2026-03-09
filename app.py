@@ -700,6 +700,38 @@ def create_app() -> Flask:
         flash("상담일지를 삭제했습니다.")
         return redirect(url_for("student_detail", student_id=log_row["student_id"]))
 
+
+    @app.route("/students/<int:student_id>/update", methods=["POST"])
+    def update_student(student_id: int) -> str:
+        student = query_db("SELECT id FROM students WHERE id = ?", (student_id,), one=True)
+        if student is None:
+            flash("학생을 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        student_no = request.form.get("student_no", "").strip()
+        phone = request.form.get("phone", "").strip()
+        guardian_phone = request.form.get("guardian_phone", "").strip()
+        note = request.form.get("note", "").strip()
+
+        if not student_no:
+            flash("학번은 비워둘 수 없습니다.")
+            return redirect(url_for("student_detail", student_id=student_id))
+
+        try:
+            execute_db(
+                """
+                UPDATE students
+                SET student_no = ?, phone = ?, guardian_phone = ?, note = ?
+                WHERE id = ?
+                """,
+                (student_no, phone, guardian_phone, note, student_id),
+            )
+            flash("학생 정보를 수정했습니다.")
+        except sqlite3.IntegrityError:
+            flash("이미 등록된 학번입니다.")
+
+        return redirect(url_for("student_detail", student_id=student_id))
+
     @app.route("/students/<int:student_id>/print")
     def student_print(student_id: int) -> str:
         student = query_db(

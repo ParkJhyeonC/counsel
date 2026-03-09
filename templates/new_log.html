@@ -120,13 +120,21 @@
     hintEl.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
   }
 
+  // 연결 일정/기선택 학생이 있으면 학년-반 필터를 해당 값으로 맞춤
+  const selected = studentSelect.selectedOptions[0];
+  if (selected && selected.dataset.grade) {
+    gradeFilter.value = selected.dataset.grade;
+  }
+  fillClassOptions();
+  if (selected && selected.dataset.class) {
+    classFilter.value = selected.dataset.class;
+  }
+  filterStudents();
+
   gradeFilter.addEventListener('change', () => {
     fillClassOptions();
     filterStudents();
   });
   classFilter.addEventListener('change', filterStudents);
-
-  fillClassOptions();
-  filterStudents();
 </script>
 {% endblock %}

@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h2>{% if edit_schedule %}상담 일정 수정{% else %}상담 일정 등록{% endif %}</h2>
+  <div class="page-intro">
+    <div>
+      <h2>{% if edit_schedule %}상담 일정 수정{% else %}상담 일정 등록{% endif %}</h2>
+      <p class="muted">학년/반 필터로 학생을 빠르게 찾을 수 있습니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('new_log') }}">상담일지 작성</a>
+  </div>
   <form method="post" class="grid-form">
     <input type="hidden" name="edit_id" value="{{ edit_schedule.id if edit_schedule else '' }}">
     <label>학년
@@ -17,6 +23,7 @@
         <option value="">전체</option>
       </select>
     </label>
+    <p class="form-hint full" id="schedule-student-filter-hint"></p>
     <label class="full">학생
       <select name="student_id" id="schedule-student-select">
         <option value="">미지정</option>
@@ -45,7 +52,7 @@
     <label class="full">메모 <textarea name="note" rows="3" placeholder="상담 준비사항">{{ edit_schedule.note if edit_schedule else '' }}</textarea></label>
     <button class="btn" type="submit">{% if edit_schedule %}일정 수정 저장{% else %}일정 등록{% endif %}</button>
     {% if edit_schedule %}
-    <a class="btn" href="{{ url_for('schedule', date=selected_date, month=selected_month) }}">수정 취소</a>
+    <a class="btn btn-secondary" href="{{ url_for('schedule', date=selected_date, month=selected_month) }}">수정 취소</a>
     {% endif %}
   </form>
 </section>
@@ -139,6 +146,7 @@
   const sg = document.getElementById('schedule-grade-filter');
   const sc = document.getElementById('schedule-class-filter');
   const ss = document.getElementById('schedule-student-select');
+  const sh = document.getElementById('schedule-student-filter-hint');
 
   function fillScheduleClassOptions() {
     const grade = sg.value;
@@ -157,13 +165,16 @@
   function filterScheduleStudents() {
     const grade = sg.value;
     const klass = sc.value;
+    let visibleCount = 0;
     [...ss.options].forEach((opt, idx) => {
       if (idx === 0) return;
       const matchesGrade = !grade || opt.dataset.grade === grade;
       const matchesClass = !klass || opt.dataset.class === klass;
       opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
     });
     if (ss.selectedOptions[0]?.hidden) ss.value = '';
+    sh.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
   }
 
   sg.addEventListener('change', () => {

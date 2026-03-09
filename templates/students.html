@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h2>학생 등록</h2>
+  <div class="page-intro">
+    <div>
+      <h2>학생 등록</h2>
+      <p class="muted">수기 입력 또는 명렬표 엑셀 업로드 중 편한 방식을 선택하세요.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('new_log') }}">상담일지 작성으로 이동</a>
+  </div>
   <form method="post" class="grid-form">
     <input type="hidden" name="form_action" value="manual">
     <label>학번 <input name="student_no" required></label>
@@ -13,7 +19,7 @@
     <label>연락처 <input name="phone"></label>
     <label>보호자 연락처 <input name="guardian_phone"></label>
     <label class="full">비고 <textarea name="note" rows="2"></textarea></label>
-    <button class="btn" type="submit">저장</button>
+    <button class="btn" type="submit">학생 저장</button>
   </form>
 </section>
 
@@ -26,6 +32,7 @@
       <input type="file" name="student_excel" accept=".xlsx" required>
     </label>
     <button class="btn" type="submit">엑셀 일괄등록 실행</button>
+    <p class="form-hint full">※ 파일의 모든 시트를 자동으로 읽어 반영합니다.</p>
   </form>
 </section>
 

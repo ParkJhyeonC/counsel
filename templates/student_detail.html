@@ -74,6 +74,7 @@
   <p><strong>요약:</strong> {{ item.log.summary }}</p>
   <p><strong>상세:</strong> {{ item.log.detail }}</p>
   <p><strong>조치/계획:</strong> {{ item.log.action_plan }}</p>
+  <p><strong>상담시간(교시):</strong> {{ item.log.counsel_period or '-' }} | <strong>소요시간:</strong> {{ item.log.duration_minutes or '-' }}분</p>
   <p><strong>다음 상담일:</strong> {{ item.log.next_date }}</p>
   <div class="button-row">
     <a class="btn" href="{{ url_for('edit_log', log_id=item.log.id) }}">수정</a>

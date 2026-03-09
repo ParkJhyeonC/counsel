@@ -321,6 +321,7 @@ def create_app() -> Flask:
         rows = query_db(
             """
             SELECT l.id, l.date, l.type, l.summary, l.detail, l.action_plan,
+                   l.counsel_period, l.duration_minutes,
                    s.name AS student_name, s.grade, s.class_no
             FROM counsel_logs l
             JOIN students s ON s.id = l.student_id
@@ -606,16 +607,30 @@ def create_app() -> Flask:
             summary = request.form.get("summary", "").strip()
             detail = request.form.get("detail", "").strip()
             action_plan = request.form.get("action_plan", "").strip()
+            counsel_period = request.form.get("counsel_period", "").strip()
+            duration_minutes_raw = request.form.get("duration_minutes", "").strip()
             next_date = request.form.get("next_date", "").strip()
             linked_schedule_id = request.form.get("schedule_id", "").strip()
+
+            duration_minutes = None
+            if duration_minutes_raw:
+                try:
+                    duration_minutes = int(duration_minutes_raw)
+                    if duration_minutes <= 0:
+                        raise ValueError
+                except ValueError:
+                    flash("소요시간은 1 이상의 숫자(분)로 입력해 주세요.")
+                    return redirect(url_for("new_log", schedule_id=linked_schedule_id))
 
             if not student_id or not date or not log_type or not summary:
                 flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
             else:
                 log_id = execute_db(
                     """
-                    INSERT INTO counsel_logs(student_id, date, type, summary, detail, action_plan, next_date, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO counsel_logs(
+                        student_id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         student_id,
@@ -624,6 +639,8 @@ def create_app() -> Flask:
                         summary,
                         detail,
                         action_plan,
+                        counsel_period or None,
+                        duration_minutes,
                         next_date or None,
                         datetime.now().isoformat(timespec="seconds"),
                     ),
@@ -696,7 +713,7 @@ def create_app() -> Flask:
     def edit_log(log_id: int) -> str:
         log_row = query_db(
             """
-            SELECT id, student_id, date, type, summary, detail, action_plan, next_date
+            SELECT id, student_id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date
             FROM counsel_logs
             WHERE id = ?
             """,
@@ -719,7 +736,19 @@ def create_app() -> Flask:
             summary = request.form.get("summary", "").strip()
             detail = request.form.get("detail", "").strip()
             action_plan = request.form.get("action_plan", "").strip()
+            counsel_period = request.form.get("counsel_period", "").strip()
+            duration_minutes_raw = request.form.get("duration_minutes", "").strip()
             next_date = request.form.get("next_date", "").strip()
+
+            duration_minutes = None
+            if duration_minutes_raw:
+                try:
+                    duration_minutes = int(duration_minutes_raw)
+                    if duration_minutes <= 0:
+                        raise ValueError
+                except ValueError:
+                    flash("소요시간은 1 이상의 숫자(분)로 입력해 주세요.")
+                    return redirect(url_for("edit_log", log_id=log_id))
 
             if not student_id or not log_date or not log_type or not summary:
                 flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
@@ -727,7 +756,7 @@ def create_app() -> Flask:
                 execute_db(
                     """
                     UPDATE counsel_logs
-                    SET student_id = ?, date = ?, type = ?, summary = ?, detail = ?, action_plan = ?, next_date = ?
+                    SET student_id = ?, date = ?, type = ?, summary = ?, detail = ?, action_plan = ?, counsel_period = ?, duration_minutes = ?, next_date = ?
                     WHERE id = ?
                     """,
                     (
@@ -737,6 +766,8 @@ def create_app() -> Flask:
                         summary,
                         detail,
                         action_plan,
+                        counsel_period or None,
+                        duration_minutes,
                         next_date or None,
                         log_id,
                     ),
@@ -851,7 +882,7 @@ def create_app() -> Flask:
 
         query = (
             """
-            SELECT id, date, type, summary, detail, action_plan, next_date, created_at
+            SELECT id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
             FROM counsel_logs
             WHERE student_id = ?
             """
@@ -915,7 +946,7 @@ def create_app() -> Flask:
 
         log_rows = query_db(
             """
-            SELECT id, date, type, summary, detail, action_plan, next_date, created_at
+            SELECT id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
             FROM counsel_logs
             WHERE student_id = ?
             ORDER BY date DESC, created_at DESC
@@ -983,6 +1014,8 @@ def init_db() -> None:
                 summary TEXT NOT NULL,
                 detail TEXT,
                 action_plan TEXT,
+                counsel_period TEXT,
+                duration_minutes INTEGER,
                 next_date TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(student_id) REFERENCES students(id)
@@ -1031,6 +1064,8 @@ def init_db() -> None:
         add_column_if_missing(conn, "students", "grade", "TEXT")
         add_column_if_missing(conn, "students", "class_no", "TEXT")
         add_column_if_missing(conn, "students", "homeroom_teacher", "TEXT")
+        add_column_if_missing(conn, "counsel_logs", "counsel_period", "TEXT")
+        add_column_if_missing(conn, "counsel_logs", "duration_minutes", "INTEGER")
         seed_default_counsel_types(conn)
     conn.close()
 

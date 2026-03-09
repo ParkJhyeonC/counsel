@@ -49,6 +49,27 @@
     <label class="full">상담요약 <input name="summary" value="{{ log.summary }}" required></label>
     <label class="full">상담내용 <textarea name="detail" rows="5">{{ log.detail }}</textarea></label>
     <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="4">{{ log.action_plan }}</textarea></label>
+    <label>대분류
+      <select name="main_category" required>
+        <option value="상담" {% if (log.main_category or '상담') == '상담' %}selected{% endif %}>상담</option>
+        <option value="검사" {% if log.main_category == '검사' %}selected{% endif %}>검사</option>
+        <option value="자문" {% if log.main_category == '자문' %}selected{% endif %}>자문</option>
+      </select>
+    </label>
+    <label>중분류
+      <select name="sub_category" required>
+        <option value="개인상담" {% if (log.sub_category or '개인상담') == '개인상담' %}selected{% endif %}>개인상담</option>
+        <option value="학부모상담" {% if log.sub_category == '학부모상담' %}selected{% endif %}>학부모상담</option>
+        <option value="집단상담" {% if log.sub_category == '집단상담' %}selected{% endif %}>집단상담</option>
+      </select>
+    </label>
+    <label>상담매체구분
+      <select name="media_type" required>
+        <option value="면담" {% if (log.media_type or '면담') == '면담' %}selected{% endif %}>면담</option>
+        <option value="전화" {% if log.media_type == '전화' %}selected{% endif %}>전화</option>
+        <option value="사이버" {% if log.media_type == '사이버' %}selected{% endif %}>사이버</option>
+      </select>
+    </label>
     <label>상담시간(교시) <input name="counsel_period" value="{{ log.counsel_period or '' }}" placeholder="예: 3교시, 점심시간"></label>
     <label>소요시간(분) <input type="number" name="duration_minutes" min="1" step="1" value="{{ log.duration_minutes or '' }}" placeholder="예: 40"></label>
     <label>다음 상담일 <input type="date" name="next_date" value="{{ log.next_date or '' }}"></label>

@@ -331,6 +331,7 @@ def create_app() -> Flask:
         rows = query_db(
             """
             SELECT l.id, l.date, l.type, l.summary, l.detail, l.duration_minutes,
+                   l.main_category, l.sub_category, l.media_type,
                    s.student_no, s.grade
             FROM counsel_logs l
             JOIN students s ON s.id = l.student_id
@@ -357,9 +358,9 @@ def create_app() -> Flask:
             ws.append([
                 "전문상담",          # 고정
                 "Wee클래스",         # 고정
-                "상담",              # 고정
-                "개인상담",          # 고정
-                row["type"] or "",  # 연동
+                row["main_category"] or "상담",
+                row["sub_category"] or "개인상담",
+                row["type"] or "",
                 1,
                 selected_year,
                 (row["date"] or "").replace("-", ""),
@@ -370,7 +371,7 @@ def create_app() -> Flask:
                 hour,
                 minute,
                 "전문상담교사",
-                "면담",
+                row["media_type"] or "면담",
             ])
 
         for col in ws.columns:
@@ -688,6 +689,9 @@ def create_app() -> Flask:
             summary = request.form.get("summary", "").strip()
             detail = request.form.get("detail", "").strip()
             action_plan = request.form.get("action_plan", "").strip()
+            main_category = request.form.get("main_category", "").strip() or "상담"
+            sub_category = request.form.get("sub_category", "").strip() or "개인상담"
+            media_type = request.form.get("media_type", "").strip() or "면담"
             counsel_period = request.form.get("counsel_period", "").strip()
             duration_minutes_raw = request.form.get("duration_minutes", "").strip()
             next_date = request.form.get("next_date", "").strip()
@@ -709,9 +713,11 @@ def create_app() -> Flask:
                 log_id = execute_db(
                     """
                     INSERT INTO counsel_logs(
-                        student_id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
+                        student_id, date, type, summary, detail, action_plan,
+                        main_category, sub_category, media_type,
+                        counsel_period, duration_minutes, next_date, created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         student_id,
@@ -720,6 +726,9 @@ def create_app() -> Flask:
                         summary,
                         detail,
                         action_plan,
+                        main_category,
+                        sub_category,
+                        media_type,
                         counsel_period or None,
                         duration_minutes,
                         next_date or None,
@@ -794,7 +803,7 @@ def create_app() -> Flask:
     def edit_log(log_id: int) -> str:
         log_row = query_db(
             """
-            SELECT id, student_id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date
+            SELECT id, student_id, date, type, summary, detail, action_plan, main_category, sub_category, media_type, counsel_period, duration_minutes, next_date
             FROM counsel_logs
             WHERE id = ?
             """,
@@ -818,6 +827,9 @@ def create_app() -> Flask:
             summary = request.form.get("summary", "").strip()
             detail = request.form.get("detail", "").strip()
             action_plan = request.form.get("action_plan", "").strip()
+            main_category = request.form.get("main_category", "").strip() or "상담"
+            sub_category = request.form.get("sub_category", "").strip() or "개인상담"
+            media_type = request.form.get("media_type", "").strip() or "면담"
             counsel_period = request.form.get("counsel_period", "").strip()
             duration_minutes_raw = request.form.get("duration_minutes", "").strip()
             next_date = request.form.get("next_date", "").strip()
@@ -838,7 +850,9 @@ def create_app() -> Flask:
                 execute_db(
                     """
                     UPDATE counsel_logs
-                    SET student_id = ?, date = ?, type = ?, summary = ?, detail = ?, action_plan = ?, counsel_period = ?, duration_minutes = ?, next_date = ?
+                    SET student_id = ?, date = ?, type = ?, summary = ?, detail = ?, action_plan = ?,
+                        main_category = ?, sub_category = ?, media_type = ?,
+                        counsel_period = ?, duration_minutes = ?, next_date = ?
                     WHERE id = ?
                     """,
                     (
@@ -848,6 +862,9 @@ def create_app() -> Flask:
                         summary,
                         detail,
                         action_plan,
+                        main_category,
+                        sub_category,
+                        media_type,
                         counsel_period or None,
                         duration_minutes,
                         next_date or None,
@@ -964,7 +981,7 @@ def create_app() -> Flask:
 
         query = (
             """
-            SELECT id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
+            SELECT id, date, type, summary, detail, action_plan, main_category, sub_category, media_type, counsel_period, duration_minutes, next_date, created_at
             FROM counsel_logs
             WHERE student_id = ?
             """
@@ -1028,7 +1045,7 @@ def create_app() -> Flask:
 
         log_rows = query_db(
             """
-            SELECT id, date, type, summary, detail, action_plan, counsel_period, duration_minutes, next_date, created_at
+            SELECT id, date, type, summary, detail, action_plan, main_category, sub_category, media_type, counsel_period, duration_minutes, next_date, created_at
             FROM counsel_logs
             WHERE student_id = ?
             ORDER BY date DESC, created_at DESC
@@ -1096,6 +1113,9 @@ def init_db() -> None:
                 summary TEXT NOT NULL,
                 detail TEXT,
                 action_plan TEXT,
+                main_category TEXT,
+                sub_category TEXT,
+                media_type TEXT,
                 counsel_period TEXT,
                 duration_minutes INTEGER,
                 next_date TEXT,
@@ -1146,6 +1166,9 @@ def init_db() -> None:
         add_column_if_missing(conn, "students", "grade", "TEXT")
         add_column_if_missing(conn, "students", "class_no", "TEXT")
         add_column_if_missing(conn, "students", "homeroom_teacher", "TEXT")
+        add_column_if_missing(conn, "counsel_logs", "main_category", "TEXT")
+        add_column_if_missing(conn, "counsel_logs", "sub_category", "TEXT")
+        add_column_if_missing(conn, "counsel_logs", "media_type", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "counsel_period", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "duration_minutes", "INTEGER")
         seed_default_counsel_types(conn)

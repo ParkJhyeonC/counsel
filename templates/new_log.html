@@ -55,6 +55,27 @@
     <label class="full">상담요약 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
     <label class="full">상담내용 <textarea name="detail" rows="4">{{ prefill_schedule.note if prefill_schedule else '' }}</textarea></label>
     <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="3"></textarea></label>
+    <label>대분류
+      <select name="main_category" required>
+        <option value="상담" selected>상담</option>
+        <option value="검사">검사</option>
+        <option value="자문">자문</option>
+      </select>
+    </label>
+    <label>중분류
+      <select name="sub_category" required>
+        <option value="개인상담" selected>개인상담</option>
+        <option value="학부모상담">학부모상담</option>
+        <option value="집단상담">집단상담</option>
+      </select>
+    </label>
+    <label>상담매체구분
+      <select name="media_type" required>
+        <option value="면담" selected>면담</option>
+        <option value="전화">전화</option>
+        <option value="사이버">사이버</option>
+      </select>
+    </label>
     <label>상담시간(교시) <input name="counsel_period" value="{{ prefill_schedule.schedule_time if prefill_schedule else '' }}" placeholder="예: 3교시, 점심시간"></label>
     <label>소요시간(분) <input type="number" name="duration_minutes" min="1" step="1" placeholder="예: 40"></label>
     <label>다음 상담일 <input type="date" name="next_date"></label>

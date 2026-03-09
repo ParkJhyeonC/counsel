@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>학생 등록</h2>
+      <p class="muted">수기 입력 또는 명렬표 엑셀 업로드 중 편한 방식을 선택하세요.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('new_log') }}">상담일지 작성으로 이동</a>
+  </div>
+  <form method="post" class="grid-form">
+    <input type="hidden" name="form_action" value="manual">
+    <label>학번 <input name="student_no" required></label>
+    <label>이름 <input name="name" required></label>
+    <label>학년 <input name="grade" placeholder="예: 1"></label>
+    <label>반 <input name="class_no" placeholder="예: 4"></label>
+    <label>반명(자동생성 가능) <input name="class_name" placeholder="예: 1-4"></label>
+    <label>담임선생님 <input name="homeroom_teacher" placeholder="예: 정은아"></label>
+    <label>연락처 <input name="phone"></label>
+    <label>보호자 연락처 <input name="guardian_phone"></label>
+    <label class="full">비고 <textarea name="note" rows="2"></textarea></label>
+    <button class="btn" type="submit">학생 저장</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>명렬표 엑셀 일괄 등록</h2>
+  <p class="muted">엑셀 파일의 모든 시트(아래 탭)를 순회하여 학생을 등록/갱신합니다. 시트명(예: 1-4)에서 학년/반을 읽고, 상단의 "담임: OOO" 정보도 함께 저장합니다.</p>
+  <form method="post" enctype="multipart/form-data" class="grid-form">
+    <input type="hidden" name="form_action" value="import_excel">
+    <label class="full">엑셀 파일 (.xlsx)
+      <input type="file" name="student_excel" accept=".xlsx" required>
+    </label>
+    <button class="btn" type="submit">엑셀 일괄등록 실행</button>
+    <p class="form-hint full">※ 파일의 모든 시트를 자동으로 읽어 반영합니다.</p>
+  </form>
+</section>
+
+<section class="card">
+  <h2>학생 조회</h2>
+  <form method="get" class="search-form">
+    <input name="q" value="{{ q }}" placeholder="학번/이름/학년/반/담임 검색">
+    <button class="btn" type="submit">검색</button>
+  </form>
+
+  <table>
+    <thead><tr><th>학번</th><th>이름</th><th>학년</th><th>반</th><th>담임</th><th>상세</th></tr></thead>
+    <tbody>
+      {% for s in students %}
+      <tr>
+        <td>{{ s.student_no }}</td>
+        <td>{{ s.name }}</td>
+        <td>{{ s.grade or '-' }}</td>
+        <td>{{ s.class_no or s.class_name or '-' }}</td>
+        <td>{{ s.homeroom_teacher or '-' }}</td>
+        <td><a href="{{ url_for('student_detail', student_id=s.id) }}">이력 보기</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">등록된 학생이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

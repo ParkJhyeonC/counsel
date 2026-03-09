@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>{{ student.name }} ({{ student.student_no }}) 상담 이력</h2>
+  <p>학년/반: {{ student.grade or '-' }}학년 {{ student.class_no or student.class_name or '-' }}반 | 담임: {{ student.homeroom_teacher or '-' }} | 연락처: {{ student.phone }} | 보호자: {{ student.guardian_phone }}</p>
+  <p>비고: {{ student.note }}</p>
+
+  <form method="get" action="{{ url_for('student_print', student_id=student.id) }}" class="search-form">
+    <label>시작일 <input type="date" name="date_from"></label>
+    <label>종료일 <input type="date" name="date_to"></label>
+    <button class="btn" type="submit">상담요약 인쇄/PDF</button>
+    <a class="btn btn-secondary" href="{{ url_for('student_record_form', student_id=student.id) }}" target="_blank">개인 상담 기록부 출력</a>
+  </form>
+</section>
+
+<section class="card ai-concept-card">
+  <div class="page-intro">
+    <div>
+      <h2>AI 사례개념화 보조</h2>
+      <p class="muted">학생 누적 상담일지를 바탕으로 초안을 만들고, 검토 후 저장해 계속 관리할 수 있습니다.</p>
+    </div>
+  </div>
+
+  <div class="ai-concept-grid">
+    <div class="ai-panel ai-panel-gen">
+      <h3>1) AI 초안 생성</h3>
+      <div class="button-row">
+        <button class="btn" type="button" id="generate-ai-case">사례개념화 초안 생성</button>
+      </div>
+      <label for="ai-case-result" class="form-hint">AI 생성 결과</label>
+      <textarea id="ai-case-result" class="ai-textarea" rows="14" placeholder="여기에 학생 누적 상담일지 기반 사례개념화 초안이 표시됩니다."></textarea>
+    </div>
+
+    <div class="ai-panel ai-panel-save">
+      <h3>2) 검토 후 저장</h3>
+      {% if case_concept %}
+      <p class="form-hint">마지막 저장: {{ case_concept.updated_at }}</p>
+      {% endif %}
+      <form method="post" action="{{ url_for('save_case_concept', student_id=student.id) }}">
+        <label for="saved-case-concept" class="form-hint">저장된 사례개념화</label>
+        <textarea id="saved-case-concept" name="case_concept" class="ai-textarea" rows="14" required>{{ case_concept.content if case_concept else '' }}</textarea>
+        <div class="button-row" style="margin-top:.55rem;">
+          <button class="btn" type="submit">사례개념화 저장</button>
+          <button class="btn btn-secondary" type="button" id="copy-ai-to-saved">AI 결과 불러오기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+
+<section class="card">
+  <h2>학생 기본정보 수정</h2>
+  <form method="post" action="{{ url_for('update_student', student_id=student.id) }}" class="grid-form">
+    <label>학번
+      <input name="student_no" value="{{ student.student_no }}" required>
+    </label>
+    <label>학생 연락처
+      <input name="phone" value="{{ student.phone or '' }}" placeholder="010-0000-0000">
+    </label>
+    <label>보호자 연락처
+      <input name="guardian_phone" value="{{ student.guardian_phone or '' }}" placeholder="010-0000-0000">
+    </label>
+    <label class="full">비고
+      <textarea name="note" rows="2">{{ student.note or '' }}</textarea>
+    </label>
+    <button class="btn" type="submit">기본정보 저장</button>
+  </form>
+</section>
+
+{% for item in logs %}
+<section class="card log-card">
+  <h3>{{ item.log.date }} - {{ item.log.type }}</h3>
+  <p><strong>요약:</strong> {{ item.log.summary }}</p>
+  <p><strong>상세:</strong> {{ item.log.detail }}</p>
+  <p><strong>조치/계획:</strong> {{ item.log.action_plan }}</p>
+  <p><strong>대/중분류:</strong> {{ item.log.main_category or '상담' }} / {{ item.log.sub_category or '개인상담' }} | <strong>매체:</strong> {{ item.log.media_type or '면담' }}</p>
+  <p><strong>상담시간(교시):</strong> {{ item.log.counsel_period or '-' }} | <strong>소요시간:</strong> {{ item.log.duration_minutes or '-' }}분</p>
+  <p><strong>다음 상담일:</strong> {{ item.log.next_date }}</p>
+  <div class="button-row">
+    <a class="btn" href="{{ url_for('edit_log', log_id=item.log.id) }}">수정</a>
+    <form method="post" action="{{ url_for('delete_log', log_id=item.log.id) }}" onsubmit="return confirm('이 상담일지를 삭제할까요?');">
+      <button class="btn btn-danger" type="submit">삭제</button>
+    </form>
+  </div>
+  {% if item.files %}
+  <p><strong>첨부:</strong>
+    {% for f in item.files %}
+      <a href="{{ url_for('uploaded_file', filename=f.file_path) }}">{{ f.original_name }}</a>{% if not loop.last %}, {% endif %}
+    {% endfor %}
+  </p>
+  {% endif %}
+</section>
+{% else %}
+<section class="card"><p>상담 이력이 없습니다.</p></section>
+{% endfor %}
+
+<script>
+  const generateBtn = document.getElementById('generate-ai-case');
+  const resultEl = document.getElementById('ai-case-result');
+  const savedEl = document.getElementById('saved-case-concept');
+  const copyBtn = document.getElementById('copy-ai-to-saved');
+
+  copyBtn.addEventListener('click', () => {
+    if (!resultEl.value.trim()) return;
+    savedEl.value = resultEl.value;
+  });
+
+  generateBtn.addEventListener('click', async () => {
+    generateBtn.disabled = true;
+    generateBtn.textContent = '생성 중...';
+
+    try {
+      const resp = await fetch('{{ url_for("ai_case_conceptualization", student_id=student.id) }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trigger: 'student_detail' })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.ok) {
+        resultEl.value = `오류: ${data.error || 'AI 생성에 실패했습니다.'}`;
+      } else {
+        resultEl.value = data.result;
+      }
+    } catch (e) {
+      resultEl.value = '오류: AI 요청 중 문제가 발생했습니다.';
+    } finally {
+      generateBtn.disabled = false;
+      generateBtn.textContent = '사례개념화 초안 생성';
+    }
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="kpi-grid">
+  <article class="card kpi-card">
+    <p class="kpi-label">전체 상담 건수</p>
+    <p class="kpi-value">{{ total_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">{{ selected_year }}년 상담 건수</p>
+    <p class="kpi-value">{{ selected_year_count }}</p>
+  </article>
+</section>
+
+<section class="card">
+  <h2>월간 상담 통계</h2>
+  <form method="get" class="search-form">
+    <label>연도 <input type="number" min="2000" max="2100" name="year" value="{{ selected_year }}"></label>
+    <label>월
+      <select name="month">
+        <option value="">선택</option>
+        {% for m in range(1, 13) %}
+        <option value="{{ '%02d'|format(m) }}" {% if request.args.get('month', '') == ('%02d'|format(m)) %}selected{% endif %}>{{ m }}월</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn" type="submit">조회</button>
+    <a class="btn" href="{{ url_for('stats_neis_monthly_export', year=selected_year, month=request.args.get('month', '')) }}">월간통계(나이스 업로드) 엑셀 다운로드</a>
+    <a class="btn btn-secondary" href="{{ url_for('stats_annual_ledger', year=selected_year) }}" target="_blank">개인상담 운영대장 출력</a>
+  </form>
+
+  <div class="stats-bars">
+    {% set max_count = (monthly_stats | map(attribute='count') | max) if monthly_stats else 0 %}
+    {% for item in monthly_stats %}
+    <div class="stats-row">
+      <span class="stats-label">{{ item.month }}</span>
+      <div class="stats-track">
+        <div class="stats-fill" style="width: {{ (item.count / max_count * 100) if max_count > 0 else 0 }}%"></div>
+      </div>
+      <span class="stats-value">{{ item.count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>년간 상담 통계</h2>
+  <table>
+    <thead><tr><th>연도</th><th>상담 건수</th></tr></thead>
+    <tbody>
+      {% for row in yearly_stats %}
+      <tr><td>{{ row.year }}</td><td>{{ row.count }}</td></tr>
+      {% else %}
+      <tr><td colspan="2">상담 통계 데이터가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

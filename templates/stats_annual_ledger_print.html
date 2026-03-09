@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ selected_year }}년 개인상담 운영대장</title>
+  <style>
+    body { font-family: 'Noto Sans KR', Arial, sans-serif; margin: 16px; color:#111; }
+    h1 { text-align:center; font-size: 30px; margin: 8px 0 14px; }
+    .meta { text-align:right; margin-bottom:10px; font-size:13px; }
+    .toolbar { margin-bottom:12px; }
+    .toolbar button, .toolbar a { margin-right:8px; }
+    table { width:100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border:1px solid #111; padding:6px 4px; font-size:13px; vertical-align: middle; }
+    th { background:#f4f4f4; }
+    .center { text-align:center; }
+    .small { font-size:12px; }
+    .w-no{width:6%} .w-date{width:14%} .w-time{width:12%} .w-min{width:9%} .w-name{width:10%}
+    .w-class{width:8%} .w-path{width:8%} .w-topic{width:13%} .w-note{width:13%}
+    @media print {
+      .toolbar { display:none; }
+      body { margin: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="{{ url_for('stats', year=selected_year) }}">통계로 돌아가기</a>
+  </div>
+
+  <h1>{{ selected_year }}년 개인상담 운영대장</h1>
+  <div class="meta">출력시각: {{ printed_at }}</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="w-no">연번</th>
+        <th class="w-date">상담일시</th>
+        <th class="w-time">상담시간</th>
+        <th class="w-min">소요시간/분</th>
+        <th class="w-name">내담자(학생)<br>성명</th>
+        <th class="w-class">학년 반</th>
+        <th class="w-path">상담경로</th>
+        <th class="w-topic">상담주제</th>
+        <th class="w-note">기타</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr>
+        <td class="center">{{ loop.index }}</td>
+        <td class="center">{{ row.date }}</td>
+        <td class="center">{{ row.counsel_period or '-' }}</td>
+        <td class="center">{{ row.duration_minutes or '-' }}</td>
+        <td class="center">{{ row.student_name }}</td>
+        <td class="center">{{ row.grade or '-' }}-{{ row.class_no or '-' }}</td>
+        <td class="center">개별상담</td>
+        <td>{{ row.summary }}</td>
+        <td class="small">{{ row.type }}{% if row.action_plan %}<br>{{ row.action_plan }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% for i in range(rows|length, 10) %}
+      <tr>
+        <td class="center">{{ i + 1 }}</td>
+        <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

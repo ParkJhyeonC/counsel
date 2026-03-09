@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ student.name }} 개인 상담 기록부</title>
+  <style>
+    body { font-family: 'Noto Sans KR', Arial, sans-serif; margin: 10px; color:#111; }
+    .toolbar { margin-bottom:12px; }
+    .toolbar button, .toolbar a { margin-right:8px; }
+    .box { border:1px solid #111; padding:8px; margin-bottom:6px; }
+    .title { text-align:center; font-size:22px; font-weight:700; margin:2px 0 6px; }
+    .sub { text-align:center; font-weight:700; margin-top:10px; }
+    table { width:100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border:1px solid #111; padding:4px 3px; font-size:12px; text-align:center; }
+    th { background:#f4f4f4; }
+    .left { text-align:left; }
+    .muted { color:#444; }
+    p { margin: 4px 0; }
+    .page { max-width: 190mm; margin: 0 auto; }
+    @media print {
+      @page { size: A4 portrait; margin: 7mm; }
+      .toolbar { display:none; }
+      body { margin:0; font-size:11px; }
+      .box { padding:6px; margin-bottom:5px; }
+      .title { font-size:19px; margin:1px 0 4px; }
+      th, td { padding:2px 2px; font-size:10.5px; }
+      p { margin: 2px 0; }
+      .page { max-width: 100%; height: 279mm; overflow: hidden; }
+    }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="{{ url_for('student_detail', student_id=student.id) }}">학생 상세로 돌아가기</a>
+  </div>
+
+  <div class="page">
+  <section class="box">
+    <div class="title">개인 상담 기록부</div>
+    <p>사례번호: {{ student.student_no }}</p>
+    <p>담당 전문상담교사: {{ student.homeroom_teacher or '-' }}</p>
+    <div class="sub">정동고등학교 Wee 클래스</div>
+  </section>
+
+  <section class="box">
+    <p><strong>1. 내담자 인적사항</strong></p>
+    <p>성 명: {{ student.name }} / 학년: {{ student.grade or '-' }} / 반: {{ student.class_no or student.class_name or '-' }}</p>
+    <p>성 별: 남/여 &nbsp;&nbsp;&nbsp; 연 령: 만 ( &nbsp; )세</p>
+
+    <p style="margin-top:12px;"><strong>2. 기록목록</strong></p>
+    <p>☐ 접수 면접 기록 &nbsp;&nbsp; ☐ 사례 개념화 및 상담계획서 &nbsp;&nbsp; ☐ 개인 상담 신청서</p>
+    <p>☐ 개인 상담기록일지 &nbsp;&nbsp; ☐ 개인 상담 종결기록</p>
+
+    <p style="margin-top:12px;"><strong>3. 검사 실시</strong></p>
+    <table>
+      <thead><tr><th>검사명</th><th>실시일시</th><th>해석일시</th><th>비고</th></tr></thead>
+      <tbody>
+        {% for i in range(3) %}
+        <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p style="margin-top:12px;"><strong>4. 상담과정</strong></p>
+    <table>
+      <thead>
+        <tr><th>횟수</th>{% for i in range(1,10) %}<th>{{ i }}</th>{% endfor %}</tr>
+        <tr><th>날짜</th>{% for i in range(9) %}<td>&nbsp;</td>{% endfor %}</tr>
+        <tr><th>횟수</th>{% for i in range(10,19) %}<th>{{ i }}</th>{% endfor %}</tr>
+        <tr><th>날짜</th>{% for i in range(9) %}<td>&nbsp;</td>{% endfor %}</tr>
+      </thead>
+    </table>
+
+    <p style="margin-top:12px;"><strong>5. 상담종결</strong></p>
+    <p>종결일: 20 &nbsp; 년 &nbsp; 월 &nbsp; 일</p>
+    <p>총 상담 횟수: {{ logs|length }}회</p>
+    <p>종결 후 상담자 소견 및 추수 관리 계획:</p>
+    <p class="muted">출력시각: {{ printed_at }}</p>
+  </section>
+</div>
+</body>
+</html>

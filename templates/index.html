@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="kpi-grid">
+  <article class="card kpi-card">
+    <p class="kpi-label">등록 학생</p>
+    <p class="kpi-value">{{ students_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">전체 상담일지</p>
+    <p class="kpi-value">{{ logs_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">예정 상담일정</p>
+    <p class="kpi-value">{{ upcoming_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">백업 파일</p>
+    <p class="kpi-value">{{ backup_count }}</p>
+  </article>
+</section>
+
+<section class="card">
+  <h2>빠른 메뉴</h2>
+  <p class="muted">학생 등록 후 상담일지를 작성할 수 있습니다.</p>
+  <div class="button-row">
+    <a class="btn" href="{{ url_for('students') }}">학생 등록/조회</a>
+    <a class="btn" href="{{ url_for('new_log') }}">상담일지 작성</a>
+    <a class="btn" href="{{ url_for('schedule') }}">상담 일정 관리</a>
+    <a class="btn" href="{{ url_for('stats') }}">상담 통계</a>
+  </div>
+</section>
+
+<section class="dashboard-grid">
+  <section class="card">
+    <h2>예정된 상담 일정</h2>
+    <table>
+      <thead><tr><th>날짜</th><th>시간</th><th>학생</th><th>제목</th></tr></thead>
+      <tbody>
+        {% for row in upcoming_schedules %}
+        <tr>
+          <td>{{ row.schedule_date }}</td>
+          <td>{{ row.schedule_time or '-' }}</td>
+          <td>{{ row.student_name or '미지정' }}</td>
+          <td>{{ row.title }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">예정된 상담 일정이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>최근 상담일지</h2>
+    <table>
+      <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th></tr></thead>
+      <tbody>
+        {% for row in latest_logs %}
+        <tr>
+          <td>{{ row.date }}</td>
+          <td>{{ row.student_name }}</td>
+          <td>{{ row.type }}</td>
+          <td>{{ row.summary }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">아직 상담일지가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</section>
+
+<section class="card">
+  <h2>자동 백업 관리</h2>
+  <p class="muted">앱 실행 시 하루 1회 자동 백업이 생성되며, 아래 버튼으로 수동 백업도 생성할 수 있습니다.</p>
+  <form method="post" action="{{ url_for('create_backup') }}">
+    <button class="btn" type="submit">지금 백업 생성</button>
+  </form>
+  <table>
+    <thead><tr><th>파일명</th><th>다운로드</th></tr></thead>
+    <tbody>
+      {% for backup in backup_files %}
+      <tr>
+        <td>{{ backup.name }}</td>
+        <td><a href="{{ url_for('download_backup', filename=backup.name) }}">다운로드</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2">생성된 백업 파일이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

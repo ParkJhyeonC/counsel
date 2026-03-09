@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>AI 설정</h2>
+  <p class="muted">웹앱에 API 키를 저장하면 학생 상세 페이지의 사례개념화 보조 기능에서 사용됩니다.</p>
+
+  <table>
+    <tr><th>현재 활성 키 소스</th><td>{{ active_source }}</td></tr>
+    <tr><th>웹앱 저장 키</th><td>{% if has_stored_key %}저장됨 ({{ key_masked }}){% else %}없음{% endif %}</td></tr>
+    <tr><th>환경변수 키(OPENAI_API_KEY)</th><td>{% if has_env_key %}감지됨{% else %}없음{% endif %}</td></tr>
+    <tr><th>활성화 테스트</th><td id="ai-key-status">미확인 (아래 버튼으로 확인)</td></tr>
+  </table>
+
+  <div class="button-row" style="margin-top:.7rem;">
+    <button class="btn" type="button" id="validate-ai-key">AI 키 활성화 테스트</button>
+  </div>
+</section>
+
+<section class="card">
+  <h2>OpenAI API 키 등록/수정</h2>
+  <form method="post" class="grid-form">
+    <label class="full">API 키
+      <input type="password" name="api_key" placeholder="sk-..." autocomplete="off">
+    </label>
+    <button class="btn" type="submit" name="action" value="save">저장</button>
+    <button class="btn" type="submit" name="action" value="clear">저장 키 삭제</button>
+  </form>
+  <p class="muted">주의: 키는 로컬 DB(app_settings 테이블)에 평문으로 저장됩니다. 개인 PC에서만 사용하세요.</p>
+</section>
+
+<script>
+  const validateBtn = document.getElementById('validate-ai-key');
+  const statusEl = document.getElementById('ai-key-status');
+
+  validateBtn.addEventListener('click', async () => {
+    validateBtn.disabled = true;
+    validateBtn.textContent = '확인 중...';
+    statusEl.textContent = '확인 중...';
+
+    try {
+      const resp = await fetch('{{ url_for("ai_settings_validate") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ check: true })
+      });
+      const data = await resp.json();
+      if (data.ok) {
+        statusEl.textContent = `활성화됨: ${data.message}`;
+      } else {
+        statusEl.textContent = `비활성/오류: ${data.message || '키 확인 실패'}`;
+      }
+    } catch (e) {
+      statusEl.textContent = '비활성/오류: 네트워크 또는 서버 오류로 확인하지 못했습니다.';
+    } finally {
+      validateBtn.disabled = false;
+      validateBtn.textContent = 'AI 키 활성화 테스트';
+    }
+  });
+</script>
+{% endblock %}

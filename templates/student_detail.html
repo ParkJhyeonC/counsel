@@ -47,6 +47,26 @@
   </div>
 </section>
 
+
+<section class="card">
+  <h2>학생 기본정보 수정</h2>
+  <form method="post" action="{{ url_for('update_student', student_id=student.id) }}" class="grid-form">
+    <label>학번
+      <input name="student_no" value="{{ student.student_no }}" required>
+    </label>
+    <label>학생 연락처
+      <input name="phone" value="{{ student.phone or '' }}" placeholder="010-0000-0000">
+    </label>
+    <label>보호자 연락처
+      <input name="guardian_phone" value="{{ student.guardian_phone or '' }}" placeholder="010-0000-0000">
+    </label>
+    <label class="full">비고
+      <textarea name="note" rows="2">{{ student.note or '' }}</textarea>
+    </label>
+    <button class="btn" type="submit">기본정보 저장</button>
+  </form>
+</section>
+
 {% for item in logs %}
 <section class="card log-card">
   <h3>{{ item.log.date }} - {{ item.log.type }}</h3>

@@ -74,6 +74,7 @@
   <p><strong>요약:</strong> {{ item.log.summary }}</p>
   <p><strong>상세:</strong> {{ item.log.detail }}</p>
   <p><strong>조치/계획:</strong> {{ item.log.action_plan }}</p>
+  <p><strong>대/중분류:</strong> {{ item.log.main_category or '상담' }} / {{ item.log.sub_category or '개인상담' }} | <strong>매체:</strong> {{ item.log.media_type or '면담' }}</p>
   <p><strong>상담시간(교시):</strong> {{ item.log.counsel_period or '-' }} | <strong>소요시간:</strong> {{ item.log.duration_minutes or '-' }}분</p>
   <p><strong>다음 상담일:</strong> {{ item.log.next_date }}</p>
   <div class="button-row">

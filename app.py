@@ -346,7 +346,7 @@ def create_app() -> Flask:
 
         headers = [
             "*상담분류", "*Wee클래스", "*대분류", "*중분류", "*상담구분", "*상담인원", "*학년도", "*상담일자",
-            "학번", "성별", "*상담제목", "*상담내용", "*상담시간(시)", "*상담시간(분)", "*상담자소속", "*상담매체구분",
+            "학년", "성별", "*상담제목", "*상담내용", "*상담시간(시)", "*상담시간(분)", "*상담자소속", "*상담매체구분",
         ]
         ws.append(headers)
 
@@ -363,7 +363,7 @@ def create_app() -> Flask:
                 1,
                 selected_year,
                 (row["date"] or "").replace("-", ""),
-                row["student_no"] or "",
+                row["grade"] or "",
                 "",
                 row["summary"] or "",
                 row["detail"] or row["summary"] or "",

@@ -69,6 +69,7 @@ def create_app() -> Flask:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    init_db()
 
     @app.before_request
     def before_request() -> None:
@@ -1276,7 +1277,7 @@ def seed_default_counsel_types(conn: sqlite3.Connection) -> None:
         "정보제공",
         "기타",
     ]
-    legacy_defaults = ["진로", "학업", "정서", "생활지도", "기타"]
+    legacy_only = {"진로", "학업", "정서", "생활지도", "기타"}
 
     existing_rows = conn.execute("SELECT id, name FROM counsel_types ORDER BY sort_order, id").fetchall()
     existing_names = [row[1] for row in existing_rows]
@@ -1286,11 +1287,26 @@ def seed_default_counsel_types(conn: sqlite3.Connection) -> None:
             conn.execute("INSERT INTO counsel_types(name, sort_order) VALUES(?, ?)", (name, idx))
         return
 
-    # 이전 기본값만 들어있는 기존 설치는 새 기본 목록으로 자동 전환
-    if existing_names == legacy_defaults:
+    # 테이블이 사실상 예전 기본유형만 있다면 전체를 새 기본유형으로 교체
+    if set(existing_names).issubset(legacy_only):
         conn.execute("DELETE FROM counsel_types")
         for idx, name in enumerate(defaults, start=1):
             conn.execute("INSERT INTO counsel_types(name, sort_order) VALUES(?, ?)", (name, idx))
+        return
+
+    # 새 기본유형은 항상 존재/정렬되도록 보장(사용자 정의 유형은 유지)
+    for idx, name in enumerate(defaults, start=1):
+        row = conn.execute("SELECT id FROM counsel_types WHERE name = ?", (name,)).fetchone()
+        if row:
+            conn.execute("UPDATE counsel_types SET sort_order = ? WHERE id = ?", (idx, row[0]))
+        else:
+            conn.execute("INSERT INTO counsel_types(name, sort_order) VALUES(?, ?)", (name, idx))
+
+    # 예전 기본유형 중 현재 기본목록에 없는 값은 미사용일 때만 정리
+    for legacy_name in ["정서", "생활지도"]:
+        used = conn.execute("SELECT COUNT(*) FROM counsel_logs WHERE type = ?", (legacy_name,)).fetchone()[0]
+        if used == 0:
+            conn.execute("DELETE FROM counsel_types WHERE name = ?", (legacy_name,))
 
 
 def get_counsel_types() -> list[sqlite3.Row]:

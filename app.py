@@ -741,6 +741,32 @@ def create_app() -> Flask:
             printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
 
+
+    @app.route("/students/<int:student_id>/case-concept", methods=["POST"])
+    def save_case_concept(student_id: int) -> str:
+        student = query_db("SELECT id FROM students WHERE id = ?", (student_id,), one=True)
+        if student is None:
+            flash("학생을 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        content = request.form.get("case_concept", "").strip()
+        if not content:
+            flash("사례개념화 내용을 입력해 주세요.")
+            return redirect(url_for("student_detail", student_id=student_id))
+
+        execute_db(
+            """
+            INSERT INTO student_case_concepts(student_id, content, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(student_id) DO UPDATE SET
+                content = excluded.content,
+                updated_at = excluded.updated_at
+            """,
+            (student_id, content, datetime.now().isoformat(timespec="seconds")),
+        )
+        flash("사례개념화를 저장했습니다.")
+        return redirect(url_for("student_detail", student_id=student_id))
+
     @app.route("/students/<int:student_id>")
     def student_detail(student_id: int) -> str:
         student = query_db(
@@ -761,6 +787,12 @@ def create_app() -> Flask:
             """,
             (student_id,),
         )
+        concept_row = query_db(
+            "SELECT content, updated_at FROM student_case_concepts WHERE student_id = ?",
+            (student_id,),
+            one=True,
+        )
+
         logs_with_files: list[dict[str, Any]] = []
         for row in log_rows:
             files = query_db(
@@ -769,7 +801,7 @@ def create_app() -> Flask:
             )
             logs_with_files.append({"log": row, "files": files})
 
-        return render_template("student_detail.html", student=student, logs=logs_with_files)
+        return render_template("student_detail.html", student=student, logs=logs_with_files, case_concept=concept_row)
 
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename: str):
@@ -845,6 +877,13 @@ def init_db() -> None:
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS student_case_concepts (
+                student_id INTEGER PRIMARY KEY,
+                content TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(student_id) REFERENCES students(id)
             );
             """
         )

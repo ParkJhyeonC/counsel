@@ -31,6 +31,12 @@
 ```
 
 ### Windows
+처음 사용자(파이썬 미설치 가능성)라면 아래를 먼저 실행하세요.
+```bat
+scripts\first_run_windows.bat
+```
+
+이미 파이썬이 설치되어 있다면 기존처럼 아래만 실행해도 됩니다.
 ```bat
 scripts\run.bat
 ```

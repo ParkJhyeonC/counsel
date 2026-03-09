@@ -8,6 +8,7 @@ import zipfile
 from urllib import error as url_error
 from urllib import request as url_request
 import json
+from io import BytesIO
 from calendar import Calendar, monthrange
 from datetime import date, datetime
 from pathlib import Path
@@ -21,11 +22,12 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     url_for,
 )
 from werkzeug.utils import secure_filename
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
 
 BASE_DIR = Path(__file__).resolve().parent
 ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
@@ -310,6 +312,85 @@ def create_app() -> Flask:
             yearly_stats=yearly_stats,
             total_count=total_count,
             selected_year_count=selected_year_count,
+        )
+
+    @app.route("/stats/neis-monthly-export")
+    def stats_neis_monthly_export():
+        selected_year = request.args.get("year", str(datetime.now().year)).strip()
+        selected_month = request.args.get("month", "").strip()
+
+        if not selected_year.isdigit():
+            selected_year = str(datetime.now().year)
+        if not selected_month.isdigit() or not (1 <= int(selected_month) <= 12):
+            flash("월을 선택해 주세요.")
+            return redirect(url_for("stats", year=selected_year))
+
+        month_int = int(selected_month)
+        month_key = f"{selected_year}-{month_int:02d}"
+
+        rows = query_db(
+            """
+            SELECT l.id, l.date, l.type, l.summary, l.detail, l.duration_minutes,
+                   s.student_no, s.grade
+            FROM counsel_logs l
+            JOIN students s ON s.id = l.student_id
+            WHERE substr(l.date, 1, 7) = ?
+            ORDER BY l.date ASC, l.created_at ASC
+            """,
+            (month_key,),
+        )
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = f"{selected_year}-{month_int:02d}"
+
+        headers = [
+            "*상담분류", "*Wee클래스", "*대분류", "*중분류", "*상담구분", "*상담인원", "*학년도", "*상담일자",
+            "학번", "성별", "*상담제목", "*상담내용", "*상담시간(시)", "*상담시간(분)", "*상담자소속", "*상담매체구분",
+        ]
+        ws.append(headers)
+
+        for row in rows:
+            duration = int(row["duration_minutes"] or 0)
+            hour = duration // 60
+            minute = duration % 60
+            ws.append([
+                "전문상담",          # 고정
+                "Wee클래스",         # 고정
+                "상담",              # 고정
+                "개인상담",          # 고정
+                row["type"] or "",  # 연동
+                1,
+                selected_year,
+                (row["date"] or "").replace("-", ""),
+                row["student_no"] or "",
+                "",
+                row["summary"] or "",
+                row["detail"] or row["summary"] or "",
+                hour,
+                minute,
+                "전문상담교사",
+                "면담",
+            ])
+
+        for col in ws.columns:
+            max_len = 0
+            col_letter = col[0].column_letter
+            for cell in col:
+                value = "" if cell.value is None else str(cell.value)
+                max_len = max(max_len, len(value))
+            ws.column_dimensions[col_letter].width = min(max_len + 2, 40)
+
+        out = BytesIO()
+        wb.save(out)
+        out.seek(0)
+
+        filename = f"neis_monthly_counsel_{selected_year}_{month_int:02d}.xlsx"
+        return send_file(
+            out,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name=filename,
         )
 
     @app.route("/stats/annual-ledger")

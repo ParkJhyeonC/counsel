@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h2>상담일지 작성</h2>
+  <div class="page-intro">
+    <div>
+      <h2>상담일지 작성</h2>
+      <p class="muted">학년/반을 먼저 고르면 학생 선택이 쉬워집니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('schedule') }}">상담 일정 보기</a>
+  </div>
   {% if prefill_schedule %}
   <p><strong>연결 일정:</strong> {{ prefill_schedule.schedule_date }} {{ prefill_schedule.schedule_time or '' }} - {{ prefill_schedule.title }}</p>
   {% endif %}
@@ -22,6 +28,7 @@
       </select>
     </label>
 
+    <p class="form-hint full" id="student-filter-hint"></p>
     <label class="full">학생
       <select name="student_id" id="student-select" required>
         <option value="">선택하세요</option>
@@ -57,6 +64,7 @@
   const gradeFilter = document.getElementById('grade-filter');
   const classFilter = document.getElementById('class-filter');
   const studentSelect = document.getElementById('student-select');
+  const hintEl = document.getElementById('student-filter-hint');
 
   function fillClassOptions() {
     const grade = gradeFilter.value;
@@ -75,13 +83,16 @@
   function filterStudents() {
     const grade = gradeFilter.value;
     const klass = classFilter.value;
+    let visibleCount = 0;
     [...studentSelect.options].forEach((opt, idx) => {
       if (idx === 0) return;
       const matchesGrade = !grade || opt.dataset.grade === grade;
       const matchesClass = !klass || opt.dataset.class === klass;
       opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
     });
     if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+    hintEl.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
   }
 
   gradeFilter.addEventListener('change', () => {

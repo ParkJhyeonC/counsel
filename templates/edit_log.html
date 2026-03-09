@@ -1,7 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h2>상담일지 수정</h2>
+  <div class="page-intro">
+    <div>
+      <h2>상담일지 수정</h2>
+      <p class="muted">기존 상담기록을 수정하고 저장할 수 있습니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=log.student_id) }}">학생 상세로 돌아가기</a>
+  </div>
   <form method="post" class="grid-form" id="edit-log-form">
     <label>학년
       <select id="grade-filter">
@@ -17,6 +23,7 @@
       </select>
     </label>
 
+    <p class="form-hint full" id="edit-student-filter-hint"></p>
     <label class="full">학생
       <select name="student_id" id="student-select" required>
         <option value="">선택하세요</option>
@@ -45,7 +52,7 @@
 
     <div class="button-row full">
       <button class="btn" type="submit">수정 저장</button>
-      <a class="btn" href="{{ url_for('student_detail', student_id=log.student_id) }}">취소</a>
+      <a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=log.student_id) }}">취소</a>
     </div>
   </form>
 </section>
@@ -66,6 +73,7 @@
   const gradeFilter = document.getElementById('grade-filter');
   const classFilter = document.getElementById('class-filter');
   const studentSelect = document.getElementById('student-select');
+  const eh = document.getElementById('edit-student-filter-hint');
 
   function fillClassOptions() {
     const grade = gradeFilter.value;
@@ -84,13 +92,16 @@
   function filterStudents() {
     const grade = gradeFilter.value;
     const klass = classFilter.value;
+    let visibleCount = 0;
     [...studentSelect.options].forEach((opt, idx) => {
       if (idx === 0) return;
       const matchesGrade = !grade || opt.dataset.grade === grade;
       const matchesClass = !klass || opt.dataset.class === klass;
       opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
     });
     if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+    eh.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
   }
 
   // 현재 선택 학생 기준으로 초기 학년/반 세팅

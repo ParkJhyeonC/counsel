@@ -11,6 +11,7 @@
     <div class="header-inner">
       <h1 class="logo"><a href="{{ url_for('index') }}">고등학교 상담일지 관리</a></h1>
       <nav class="top-nav">
+        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">홈</a>
         <a class="nav-link {% if request.path.startswith('/students') %}active{% endif %}" href="{{ url_for('students') }}">학생관리</a>
         <a class="nav-link {% if request.path.startswith('/logs/new') %}active{% endif %}" href="{{ url_for('new_log') }}">상담일지 작성</a>
         <a class="nav-link {% if request.path.startswith('/schedule') %}active{% endif %}" href="{{ url_for('schedule') }}">상담 일정</a>

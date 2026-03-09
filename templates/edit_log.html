@@ -38,11 +38,12 @@
     <label>상담일 <input type="date" name="date" value="{{ log.date }}" required></label>
     <label>상담유형
       <select name="type" required>
-        <option {% if log.type == '진로' %}selected{% endif %}>진로</option>
-        <option {% if log.type == '학업' %}selected{% endif %}>학업</option>
-        <option {% if log.type == '정서' %}selected{% endif %}>정서</option>
-        <option {% if log.type == '생활지도' %}selected{% endif %}>생활지도</option>
-        <option {% if log.type == '기타' %}selected{% endif %}>기타</option>
+        {% for ct in counsel_types %}
+        <option value="{{ ct.name }}" {% if log.type == ct.name %}selected{% endif %}>{{ ct.name }}</option>
+        {% endfor %}
+        {% if counsel_types | selectattr('name', 'equalto', log.type) | list | length == 0 %}
+        <option value="{{ log.type }}" selected>{{ log.type }} (기존값)</option>
+        {% endif %}
       </select>
     </label>
     <label class="full">상담요약 <input name="summary" value="{{ log.summary }}" required></label>

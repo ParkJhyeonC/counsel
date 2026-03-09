@@ -16,6 +16,7 @@
         <a class="nav-link {% if request.path.startswith('/logs/new') %}active{% endif %}" href="{{ url_for('new_log') }}">상담일지 작성</a>
         <a class="nav-link {% if request.path.startswith('/schedule') %}active{% endif %}" href="{{ url_for('schedule') }}">상담 일정</a>
         <a class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}" href="{{ url_for('stats') }}">상담 통계</a>
+        <a class="nav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
         <a class="nav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
       </nav>
     </div>

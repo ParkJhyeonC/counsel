@@ -4,18 +4,29 @@
   <meta charset="UTF-8">
   <title>{{ student.name }} 개인 상담 기록부</title>
   <style>
-    body { font-family: 'Noto Sans KR', Arial, sans-serif; margin: 14px; color:#111; }
+    body { font-family: 'Noto Sans KR', Arial, sans-serif; margin: 10px; color:#111; }
     .toolbar { margin-bottom:12px; }
     .toolbar button, .toolbar a { margin-right:8px; }
-    .box { border:1px solid #111; padding:12px; margin-bottom:10px; }
-    .title { text-align:center; font-size:28px; font-weight:700; margin:4px 0 8px; }
+    .box { border:1px solid #111; padding:8px; margin-bottom:6px; }
+    .title { text-align:center; font-size:22px; font-weight:700; margin:2px 0 6px; }
     .sub { text-align:center; font-weight:700; margin-top:10px; }
     table { width:100%; border-collapse: collapse; table-layout: fixed; }
-    th, td { border:1px solid #111; padding:6px 4px; font-size:13px; text-align:center; }
+    th, td { border:1px solid #111; padding:4px 3px; font-size:12px; text-align:center; }
     th { background:#f4f4f4; }
     .left { text-align:left; }
     .muted { color:#444; }
-    @media print { .toolbar { display:none; } body { margin:0; } }
+    p { margin: 4px 0; }
+    .page { max-width: 190mm; margin: 0 auto; }
+    @media print {
+      @page { size: A4 portrait; margin: 7mm; }
+      .toolbar { display:none; }
+      body { margin:0; font-size:11px; }
+      .box { padding:6px; margin-bottom:5px; }
+      .title { font-size:19px; margin:1px 0 4px; }
+      th, td { padding:2px 2px; font-size:10.5px; }
+      p { margin: 2px 0; }
+      .page { max-width: 100%; height: 279mm; overflow: hidden; }
+    }
   </style>
 </head>
 <body>
@@ -24,6 +35,7 @@
     <a href="{{ url_for('student_detail', student_id=student.id) }}">학생 상세로 돌아가기</a>
   </div>
 
+  <div class="page">
   <section class="box">
     <div class="title">개인 상담 기록부</div>
     <p>사례번호: {{ student.student_no }}</p>
@@ -44,7 +56,7 @@
     <table>
       <thead><tr><th>검사명</th><th>실시일시</th><th>해석일시</th><th>비고</th></tr></thead>
       <tbody>
-        {% for i in range(4) %}
+        {% for i in range(3) %}
         <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
         {% endfor %}
       </tbody>
@@ -66,5 +78,6 @@
     <p>종결 후 상담자 소견 및 추수 관리 계획:</p>
     <p class="muted">출력시각: {{ printed_at }}</p>
   </section>
+</div>
 </body>
 </html>

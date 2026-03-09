@@ -312,6 +312,32 @@ def create_app() -> Flask:
             selected_year_count=selected_year_count,
         )
 
+    @app.route("/stats/annual-ledger")
+    def stats_annual_ledger() -> str:
+        selected_year = request.args.get("year", str(datetime.now().year)).strip()
+        if not selected_year.isdigit():
+            selected_year = str(datetime.now().year)
+
+        rows = query_db(
+            """
+            SELECT l.id, l.date, l.type, l.summary, l.detail, l.action_plan,
+                   s.name AS student_name, s.grade, s.class_no
+            FROM counsel_logs l
+            JOIN students s ON s.id = l.student_id
+            WHERE substr(l.date, 1, 4) = ?
+            ORDER BY l.date ASC, l.created_at ASC
+            """,
+            (selected_year,),
+        )
+
+        return render_template(
+            "stats_annual_ledger_print.html",
+            selected_year=selected_year,
+            rows=rows,
+            printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+
+
     @app.route("/schedule", methods=["GET", "POST"])
     def schedule() -> str:
         requested_date = request.args.get("date", "").strip()
@@ -779,6 +805,35 @@ def create_app() -> Flask:
             flash("이미 등록된 학번입니다.")
 
         return redirect(url_for("student_detail", student_id=student_id))
+
+    @app.route("/students/<int:student_id>/record-form")
+    def student_record_form(student_id: int) -> str:
+        student = query_db(
+            "SELECT id, student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note FROM students WHERE id = ?",
+            (student_id,),
+            one=True,
+        )
+        if student is None:
+            flash("학생을 찾을 수 없습니다.")
+            return redirect(url_for("students"))
+
+        logs = query_db(
+            """
+            SELECT id, date, type, summary
+            FROM counsel_logs
+            WHERE student_id = ?
+            ORDER BY date ASC, created_at ASC
+            """,
+            (student_id,),
+        )
+
+        return render_template(
+            "student_record_form_print.html",
+            student=student,
+            logs=logs,
+            printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
+        )
+
 
     @app.route("/students/<int:student_id>/print")
     def student_print(student_id: int) -> str:

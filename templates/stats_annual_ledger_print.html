@@ -50,8 +50,8 @@
       <tr>
         <td class="center">{{ loop.index }}</td>
         <td class="center">{{ row.date }}</td>
-        <td class="center">-</td>
-        <td class="center">-</td>
+        <td class="center">{{ row.counsel_period or '-' }}</td>
+        <td class="center">{{ row.duration_minutes or '-' }}</td>
         <td class="center">{{ row.student_name }}</td>
         <td class="center">{{ row.grade or '-' }}-{{ row.class_no or '-' }}</td>
         <td class="center">개별상담</td>

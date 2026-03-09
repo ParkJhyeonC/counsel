@@ -49,6 +49,8 @@
     <label class="full">상담요약 <input name="summary" value="{{ log.summary }}" required></label>
     <label class="full">상담내용 <textarea name="detail" rows="5">{{ log.detail }}</textarea></label>
     <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="4">{{ log.action_plan }}</textarea></label>
+    <label>상담시간(교시) <input name="counsel_period" value="{{ log.counsel_period or '' }}" placeholder="예: 3교시, 점심시간"></label>
+    <label>소요시간(분) <input type="number" name="duration_minutes" min="1" step="1" value="{{ log.duration_minutes or '' }}" placeholder="예: 40"></label>
     <label>다음 상담일 <input type="date" name="next_date" value="{{ log.next_date or '' }}"></label>
 
     <div class="button-row full">

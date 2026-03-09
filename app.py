@@ -727,6 +727,7 @@ def create_app() -> Flask:
         student_rows = query_db(
             "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"
         )
+        counsel_types = get_counsel_types()
         grades, grade_class_map = get_grade_class_filters(student_rows)
 
         if request.method == "POST":

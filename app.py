@@ -1408,6 +1408,7 @@ def create_app() -> Flask:
         counselor_name = get_app_setting("counselor_name", student["homeroom_teacher"] or "-")
         school_name = get_app_setting("school_name", "정동고등학교")
         end_date = logs[-1]["date"] if logs else ""
+        closing_comment = logs[-1]["action_plan"] if logs and logs[-1]["action_plan"] else ""
 
         return render_template(
             "student_record_form_print.html",
@@ -1418,6 +1419,7 @@ def create_app() -> Flask:
             counselor_name=counselor_name,
             school_name=school_name,
             end_date=end_date,
+            closing_comment=closing_comment,
             printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
 

@@ -2047,7 +2047,23 @@ def request_gemini_api_health(api_key: str) -> None:
 
 
 def request_gemini_case_conceptualization(api_key: str, system_prompt: str, user_prompt: str) -> str:
-    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    configured_model = os.environ.get("GEMINI_MODEL", "").strip()
+    candidate_models: list[str] = []
+    if configured_model:
+        candidate_models.append(configured_model)
+    candidate_models.extend([
+        "gemini-2.0-flash",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-pro-latest",
+    ])
+
+    seen: set[str] = set()
+    deduped_models: list[str] = []
+    for model in candidate_models:
+        if model and model not in seen:
+            seen.add(model)
+            deduped_models.append(model)
+
     body = {
         "contents": [
             {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}
@@ -2057,29 +2073,39 @@ def request_gemini_case_conceptualization(api_key: str, system_prompt: str, user
         },
     }
     data = json.dumps(body).encode("utf-8")
-    req = url_request.Request(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
-        data=data,
-        method="POST",
-        headers={"Content-Type": "application/json"},
-    )
-    try:
-        with url_request.urlopen(req, timeout=30) as response:
-            raw = response.read().decode("utf-8")
-            parsed = json.loads(raw)
-            candidates = parsed.get("candidates") or []
-            if not candidates:
-                raise RuntimeError("Gemini 응답에 생성 결과가 없습니다.")
-            parts = (candidates[0].get("content") or {}).get("parts") or []
-            text = "".join(str(p.get("text", "")) for p in parts).strip()
-            if not text:
-                raise RuntimeError("Gemini 응답 텍스트를 파싱하지 못했습니다.")
-            return text
-    except url_error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="ignore")
-        raise RuntimeError(f"Gemini API 오류: {detail}") from exc
-    except url_error.URLError as exc:
-        raise RuntimeError("Gemini API 연결에 실패했습니다. 네트워크를 확인하세요.") from exc
+
+    last_error_detail = ""
+    for model in deduped_models:
+        req = url_request.Request(
+            f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+            data=data,
+            method="POST",
+            headers={"Content-Type": "application/json"},
+        )
+        try:
+            with url_request.urlopen(req, timeout=30) as response:
+                raw = response.read().decode("utf-8")
+                parsed = json.loads(raw)
+                candidates = parsed.get("candidates") or []
+                if not candidates:
+                    raise RuntimeError("Gemini 응답에 생성 결과가 없습니다.")
+                parts = (candidates[0].get("content") or {}).get("parts") or []
+                text = "".join(str(p.get("text", "")) for p in parts).strip()
+                if not text:
+                    raise RuntimeError("Gemini 응답 텍스트를 파싱하지 못했습니다.")
+                return text
+        except url_error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="ignore")
+            last_error_detail = detail
+            lowered = detail.lower()
+            if exc.code == 404 or "not_found" in lowered or "not found for api version" in lowered:
+                continue
+            raise RuntimeError(f"Gemini API 오류: {detail}") from exc
+        except url_error.URLError as exc:
+            raise RuntimeError("Gemini API 연결에 실패했습니다. 네트워크를 확인하세요.") from exc
+
+    hint = "GEMINI_MODEL 환경변수에 사용 가능한 모델명을 지정해 보세요. (예: gemini-2.0-flash)"
+    raise RuntimeError(f"Gemini API 오류: 사용 가능한 모델을 찾지 못했습니다. {hint} 상세: {last_error_detail}")
 
 
 def query_db(query: str, params: tuple[Any, ...] = (), one: bool = False):

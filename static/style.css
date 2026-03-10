@@ -61,6 +61,23 @@ body {
   line-height: 1;
 }
 
+.lock-nav-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: .25rem;
+}
+
+.nav-countdown {
+  font-size: .78rem;
+  color: #475569;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: .18rem .45rem;
+  min-width: 50px;
+  text-align: center;
+}
+
 main { max-width: 1100px; margin: 1.2rem auto; padding: 0 1rem 2rem; }
 
 .card {

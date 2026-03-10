@@ -22,8 +22,9 @@
         <a class="nav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
         <a class="nav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
         {% if g.security_configured %}
-        <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;">
+        <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
           <button class="nav-link nav-link-btn" type="submit">잠금</button>
+          <span class="nav-countdown" id="lock-countdown">30:00</span>
         </form>
         {% endif %}
       </nav>
@@ -47,6 +48,21 @@
   <script>
     const LOCK_TIMEOUT_MS = 30 * 60 * 1000;
     let lockTimer = null;
+    let countdownTimer = null;
+    let remainingMs = LOCK_TIMEOUT_MS;
+    const countdownEl = document.getElementById('lock-countdown');
+
+    function formatCountdown(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const sec = String(totalSec % 60).padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+
+    function updateCountdownText() {
+      if (!countdownEl) return;
+      countdownEl.textContent = formatCountdown(remainingMs);
+    }
 
     async function autoLock() {
       try {
@@ -58,13 +74,26 @@
 
     function resetLockTimer() {
       if (lockTimer) clearTimeout(lockTimer);
+      remainingMs = LOCK_TIMEOUT_MS;
+      updateCountdownText();
       lockTimer = setTimeout(autoLock, LOCK_TIMEOUT_MS);
+    }
+
+    function startCountdownTicker() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        remainingMs -= 1000;
+        if (remainingMs < 0) remainingMs = 0;
+        updateCountdownText();
+      }, 1000);
     }
 
     ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
       window.addEventListener(eventName, resetLockTimer, { passive: true });
     });
+
     resetLockTimer();
+    startCountdownTicker();
   </script>
   {% endif %}
 

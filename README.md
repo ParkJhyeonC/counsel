@@ -110,14 +110,14 @@ scripts\build_setup_windows.bat
    - Gemini (macOS/Linux)
    ```bash
    export GEMINI_API_KEY="여기에_키"
-   export GEMINI_MODEL="gemini-1.5-flash"   # 선택(미설정 시 기본값 사용)
+   export GEMINI_MODEL="gemini-2.0-flash"   # 선택(미설정 시 자동 fallback)
    ```
    - Windows(CMD)
    ```bat
    set OPENAI_API_KEY=여기에_키
    set OPENAI_MODEL=gpt-4.1-mini
    set GEMINI_API_KEY=여기에_키
-   set GEMINI_MODEL=gemini-1.5-flash
+   set GEMINI_MODEL=gemini-2.0-flash
    ```
 2. `scripts/run.sh` 또는 `scripts\run.bat`로 앱 실행
 3. 상단 메뉴의 `AI 설정`에서 기본 제공자(OpenAI/Gemini)와 API 키를 등록(또는 환경변수 사용)

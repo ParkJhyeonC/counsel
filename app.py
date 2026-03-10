@@ -127,7 +127,7 @@ def create_app() -> Flask:
     @app.context_processor
     def inject_global_branding() -> dict[str, str]:
         school_name = get_app_setting("school_name", "정동고등학교")
-        app_title = f"{school_name} 상담일지 관리"
+        app_title = f"{school_name} 카운슬로그"
         vacation_dday_text = get_vacation_dday_text(datetime.now().date())
         return {
             "school_name_global": school_name,

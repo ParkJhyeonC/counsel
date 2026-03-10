@@ -23,7 +23,7 @@
         <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('settings_index') }}">설정</a>
         {% if g.security_configured %}
         <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
-          <button class="nav-link nav-link-btn" type="submit">잠금</button>
+          <button class="nav-link nav-link-btn" type="submit" title="잠금">🔒</button>
           <span class="nav-countdown" id="lock-countdown">30:00</span>
         </form>
         {% endif %}

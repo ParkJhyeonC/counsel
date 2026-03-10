@@ -77,16 +77,29 @@ body {
 .lock-nav-wrap {
   display: inline-flex;
   align-items: center;
-  gap: .25rem;
+  gap: .2rem;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 999px;
+  padding: .12rem .22rem;
+}
+
+.lock-nav-wrap .nav-link-btn {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: .26rem .52rem;
+  color: #1e40af;
+  font-weight: 700;
+}
+.lock-nav-wrap .nav-link-btn:hover {
+  background: #dbeafe;
 }
 
 .nav-countdown {
   font-size: .78rem;
   color: #475569;
-  background: #eef2ff;
-  border: 1px solid #c7d2fe;
-  border-radius: 999px;
-  padding: .18rem .45rem;
+  padding: .12rem .35rem;
   min-width: 50px;
   text-align: center;
 }

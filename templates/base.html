@@ -11,7 +11,7 @@
     <div class="header-inner">
       <div class="brand-block">
         <h1 class="logo"><a href="{{ url_for('index') }}">{{ app_title }}</a></h1>
-        <p class="logo-sub">학교 설정에서 학교명을 변경하면 상단 제목에 반영됩니다.</p>
+        {% if show_school_name_hint %}<p class="logo-sub">학교 설정에서 학교명을 변경하면 상단 제목에 반영됩니다.</p>{% endif %}
       </div>
       <nav class="top-nav">
         <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">홈</a>

@@ -648,6 +648,15 @@ def create_app() -> Flask:
                     execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
                     flash("임시공휴일을 삭제했습니다.")
                     return redirect(url_for("absence_tracker"))
+            elif action == "mark_return":
+                absence_id = request.form.get("absence_id", "").strip()
+                if absence_id.isdigit():
+                    execute_db(
+                        "UPDATE unexcused_absences SET is_active = 0, return_date = ? WHERE id = ?",
+                        (datetime.now().date().isoformat(), int(absence_id)),
+                    )
+                    flash("복귀 처리되었습니다.")
+                    return redirect(url_for("absence_tracker"))
 
         student_rows = query_db(
             "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"
@@ -666,11 +675,11 @@ def create_app() -> Flask:
 
         rows = query_db(
             """
-            SELECT a.id, a.student_id, a.start_date, a.home_visit_done, a.home_visit_done_at, a.created_at,
+            SELECT a.id, a.student_id, a.start_date, a.home_visit_done, a.home_visit_done_at, a.is_active, a.return_date, a.created_at,
                    s.student_no, s.name AS student_name, s.grade, s.class_no, s.class_name
             FROM unexcused_absences a
             JOIN students s ON s.id = a.student_id
-            ORDER BY a.start_date ASC, a.id DESC
+            ORDER BY a.is_active DESC, a.start_date ASC, a.id DESC
             """
         )
 
@@ -689,6 +698,7 @@ def create_app() -> Flask:
                 "is_report_due": absence_days >= 7,
                 "is_home_visit_due": absence_days >= 2,
                 "danger_ratio": danger_ratio,
+                "is_active": bool(row["is_active"] if row["is_active"] is not None else 1),
             })
 
         return render_template(
@@ -702,9 +712,13 @@ def create_app() -> Flask:
 
     @app.route("/absence/<int:absence_id>/home-visit", methods=["POST"])
     def mark_home_visit(absence_id: int) -> str:
-        row = query_db("SELECT id, home_visit_done FROM unexcused_absences WHERE id = ?", (absence_id,), one=True)
+        row = query_db("SELECT id, home_visit_done, is_active FROM unexcused_absences WHERE id = ?", (absence_id,), one=True)
         if row is None:
             flash("대상을 찾을 수 없습니다.")
+            return redirect(url_for("absence_tracker"))
+
+        if not row["is_active"]:
+            flash("이미 복귀 처리된 대상입니다.")
             return redirect(url_for("absence_tracker"))
 
         if row["home_visit_done"]:
@@ -1310,6 +1324,8 @@ def init_db() -> None:
                 start_date TEXT NOT NULL,
                 home_visit_done INTEGER NOT NULL DEFAULT 0,
                 home_visit_done_at TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1,
+                return_date TEXT,
                 created_at TEXT NOT NULL,
                 FOREIGN KEY(student_id) REFERENCES students(id)
             );
@@ -1334,6 +1350,8 @@ def init_db() -> None:
         add_column_if_missing(conn, "counsel_logs", "media_type", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "counsel_period", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "duration_minutes", "INTEGER")
+        add_column_if_missing(conn, "unexcused_absences", "is_active", "INTEGER NOT NULL DEFAULT 1")
+        add_column_if_missing(conn, "unexcused_absences", "return_date", "TEXT")
         seed_default_counsel_types(conn)
     conn.close()
 

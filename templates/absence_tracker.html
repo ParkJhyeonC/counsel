@@ -67,7 +67,7 @@
   <table>
     <thead>
       <tr>
-        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th>
+        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th><th>복귀처리</th>
       </tr>
     </thead>
     <tbody>
@@ -81,7 +81,7 @@
           </span>
         </td>
         <td>
-          {% if item.is_home_visit_due %}
+          {% if item.is_active and item.is_home_visit_due %}
             {% if item.row.home_visit_done %}
               <span class="visit-done">완료</span>
             {% else %}
@@ -94,15 +94,30 @@
           {% endif %}
         </td>
         <td>
-          {% if item.is_report_due %}
-            <strong class="warn-red">교육청 보고 필요</strong>
+          {% if item.is_active %}
+            {% if item.is_report_due %}
+              <strong class="warn-red">교육청 보고 필요</strong>
+            {% else %}
+              <span class="muted">{{ 7 - item.absence_days }}일 남음</span>
+            {% endif %}
           {% else %}
-            <span class="muted">{{ 7 - item.absence_days }}일 남음</span>
+            <span class="visit-done">복귀완료 ({{ item.row.return_date or '-' }})</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.is_active %}
+          <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="mark_return">
+            <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+            <button class="btn btn-secondary" type="submit">복귀처리</button>
+          </form>
+          {% else %}
+          <span class="muted">-</span>
           {% endif %}
         </td>
       </tr>
       {% else %}
-      <tr><td colspan="5">등록된 대상이 없습니다.</td></tr>
+      <tr><td colspan="6">등록된 대상이 없습니다.</td></tr>
       {% endfor %}
     </tbody>
   </table>

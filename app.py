@@ -125,15 +125,12 @@ def create_app() -> Flask:
             db.close()
 
     @app.context_processor
-    def inject_global_branding() -> dict[str, str | bool]:
-        default_school_name = "정동고등학교"
-        school_name = get_app_setting("school_name", default_school_name)
+    def inject_global_branding() -> dict[str, str]:
+        school_name = get_app_setting("school_name", "정동고등학교")
         app_title = f"{school_name} 상담일지 관리"
-        show_school_name_hint = school_name == default_school_name
         return {
             "school_name_global": school_name,
             "app_title": app_title,
-            "show_school_name_hint": show_school_name_hint,
         }
 
     @app.route("/")
@@ -262,6 +259,10 @@ def create_app() -> Flask:
         except RuntimeError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 502
 
+
+    @app.route("/settings")
+    def settings_index() -> str:
+        return render_template("settings_index.html")
 
     @app.route("/settings/ai", methods=["GET", "POST"])
     def ai_settings() -> str:

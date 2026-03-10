@@ -11,7 +11,6 @@
     <div class="header-inner">
       <div class="brand-block">
         <h1 class="logo"><a href="{{ url_for('index') }}">{{ app_title }}</a></h1>
-        {% if show_school_name_hint %}<p class="logo-sub">학교 설정에서 학교명을 변경하면 상단 제목에 반영됩니다.</p>{% endif %}
       </div>
       <nav class="top-nav">
         <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">홈</a>
@@ -21,9 +20,7 @@
         <a class="nav-link {% if request.path.startswith('/schedule') %}active{% endif %}" href="{{ url_for('schedule') }}">상담 일정</a>
         <a class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}" href="{{ url_for('absence_tracker') }}">미인정결석 관리</a>
         <a class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}" href="{{ url_for('stats') }}">상담 통계</a>
-        <a class="nav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
-        <a class="nav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
-        <a class="nav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
+        <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('settings_index') }}">설정</a>
         {% if g.security_configured %}
         <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
           <button class="nav-link nav-link-btn" type="submit">잠금</button>
@@ -33,6 +30,17 @@
       </nav>
     </div>
   </header>
+
+  {% if request.path == '/settings' or request.path.startswith('/settings/') %}
+  <div class="settings-subnav-wrap">
+    <div class="settings-subnav">
+      <a class="subnav-link {% if request.path == '/settings' %}active{% endif %}" href="{{ url_for('settings_index') }}">설정 홈</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
+    </div>
+  </div>
+  {% endif %}
 
   <main>
     {% with messages = get_flashed_messages() %}

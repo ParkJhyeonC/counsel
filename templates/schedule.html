@@ -69,11 +69,11 @@
 
   <div class="month-grid">
     <div class="week-label">월</div><div class="week-label">화</div><div class="week-label">수</div>
-    <div class="week-label">목</div><div class="week-label">금</div><div class="week-label">토</div><div class="week-label">일</div>
+    <div class="week-label">목</div><div class="week-label">금</div><div class="week-label saturday">토</div><div class="week-label sunday">일</div>
 
     {% for week in calendar_weeks %}
       {% for day in week %}
-      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %} {% if day.is_holiday %}holiday{% endif %}">
+      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %} {% if day.is_holiday %}holiday{% endif %} {% if day.is_saturday %}saturday{% endif %} {% if day.is_sunday %}sunday{% endif %}">
         <a class="day-number" href="{{ url_for('schedule', month=selected_month, date=day.date) }}">{{ day.day }}</a>
         {% if day.is_holiday %}<div class="holiday-chip">{{ day.holiday_name }}</div>{% endif %}
         {% for item in day.schedules %}

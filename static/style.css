@@ -346,3 +346,43 @@ tr:hover td { background: #fbfdff; }
   background: #dbeafe;
   color: #1d4ed8;
 }
+
+
+.vacation-dday {
+  display: inline-block;
+  margin-top: .1rem;
+  font-size: .78rem;
+  font-weight: 700;
+  color: #b91c1c;
+  background: #fee2e2;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: .15rem .5rem;
+}
+
+.week-label.saturday, .day-cell.saturday .day-number { color: #1d4ed8; }
+.week-label.sunday, .day-cell.sunday .day-number { color: #b91c1c; }
+
+.mini-calendar-card { padding-bottom: .8rem; }
+.mini-cal-grid {
+  margin-top: .35rem;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0,1fr));
+  gap: .15rem;
+}
+.mini-head { text-align: center; font-size: .72rem; color: #64748b; }
+.mini-head.saturday { color: #1d4ed8; }
+.mini-head.sunday { color: #b91c1c; }
+.mini-day {
+  text-align: center;
+  font-size: .72rem;
+  padding: .16rem 0;
+  border-radius: 6px;
+  background: #f8fafc;
+  color: #334155;
+}
+.mini-day.outside { color: #94a3b8; background: #f8fafc; }
+.mini-day.today { outline: 1px solid #2563eb; font-weight: 700; }
+.mini-day.holiday { background: #fee2e2; color: #b91c1c; }
+.mini-day.saturday { color: #1d4ed8; }
+.mini-day.sunday { color: #b91c1c; }

@@ -128,9 +128,11 @@ def create_app() -> Flask:
     def inject_global_branding() -> dict[str, str]:
         school_name = get_app_setting("school_name", "정동고등학교")
         app_title = f"{school_name} 상담일지 관리"
+        vacation_dday_text = get_vacation_dday_text(datetime.now().date())
         return {
             "school_name_global": school_name,
             "app_title": app_title,
+            "vacation_dday_text": vacation_dday_text,
         }
 
     @app.route("/")
@@ -161,6 +163,34 @@ def create_app() -> Flask:
             (datetime.now().date().isoformat(),),
         )
         backup_files = list_backup_files()
+
+        mini_today = datetime.now().date()
+        mini_year, mini_month = mini_today.year, mini_today.month
+        mini_cal = Calendar(firstweekday=0)
+        mini_weeks: list[list[dict[str, Any]]] = []
+        mini_dates = [d for week in mini_cal.monthdatescalendar(mini_year, mini_month) for d in week]
+        mini_holiday_years = {d.year for d in mini_dates}
+        mini_holiday_map: dict[str, str] = dict(get_korean_public_holidays(mini_holiday_years))
+        for row in query_db("SELECT holiday_date, name FROM school_holidays"):
+            mini_holiday_map[row["holiday_date"]] = row["name"] or "임시공휴일"
+        mini_vacation_map = get_vacation_date_map(mini_dates[0], mini_dates[-1])
+        mini_holiday_map.update(mini_vacation_map)
+
+        for week in mini_cal.monthdatescalendar(mini_year, mini_month):
+            week_items = []
+            for d in week:
+                iso = d.isoformat()
+                is_sunday = d.weekday() == 6
+                week_items.append({
+                    "day": d.day,
+                    "is_current_month": d.month == mini_month,
+                    "is_today": d == mini_today,
+                    "is_saturday": d.weekday() == 5,
+                    "is_sunday": is_sunday,
+                    "is_holiday": is_sunday or iso in mini_holiday_map,
+                })
+            mini_weeks.append(week_items)
+
         absence_summary = query_db(
             """
             SELECT
@@ -179,7 +209,8 @@ def create_app() -> Flask:
             upcoming_schedules=upcoming_schedules,
             backup_files=backup_files,
             upcoming_count=len(upcoming_schedules),
-            backup_count=len(backup_files),
+            mini_calendar_weeks=mini_weeks,
+            mini_month_title=f"{mini_year}년 {mini_month}월",
             active_absence_count=(absence_summary["active_count"] or 0),
             home_visit_pending_count=(absence_summary["home_visit_pending"] or 0),
         )
@@ -789,6 +820,8 @@ def create_app() -> Flask:
         holiday_map: dict[str, str] = dict(auto_holidays)
         for row in temp_holiday_rows:
             holiday_map[row["holiday_date"]] = row["name"] or "임시공휴일"
+        vacation_map = get_vacation_date_map(first_day_of_month, last_day_of_month)
+        holiday_map.update(vacation_map)
 
         calendar_weeks: list[list[dict[str, Any]]] = []
         for week_dates in cal.monthdatescalendar(calendar_year, calendar_month):
@@ -803,8 +836,10 @@ def create_app() -> Flask:
                         "is_current_month": day_obj.month == calendar_month,
                         "is_selected": day_key == selected_date,
                         "is_today": day_key == datetime.now().date().isoformat(),
-                        "is_holiday": day_key in holiday_map,
-                        "holiday_name": holiday_map.get(day_key, ""),
+                        "is_saturday": day_obj.weekday() == 5,
+                        "is_sunday": day_obj.weekday() == 6,
+                        "is_holiday": day_obj.weekday() == 6 or day_key in holiday_map,
+                        "holiday_name": holiday_map.get(day_key, "일요일" if day_obj.weekday() == 6 else ""),
                         "schedules": day_schedules[:3],
                         "extra_count": max(0, len(day_schedules) - 3),
                     }
@@ -840,6 +875,41 @@ def create_app() -> Flask:
             grades=grades,
             grade_class_map=grade_class_map,
         )
+
+    @app.route("/settings/vacations", methods=["GET", "POST"])
+    def vacation_settings() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "add_vacation":
+                start_date = request.form.get("start_date", "").strip()
+                end_date = request.form.get("end_date", "").strip()
+                name = request.form.get("name", "").strip() or "방학"
+                if not start_date or not end_date:
+                    flash("방학 시작일과 종료일을 입력해 주세요.")
+                else:
+                    try:
+                        s = date.fromisoformat(start_date)
+                        e = date.fromisoformat(end_date)
+                        if e < s:
+                            flash("종료일은 시작일 이후여야 합니다.")
+                        else:
+                            execute_db(
+                                "INSERT INTO school_vacations(start_date, end_date, name) VALUES (?, ?, ?)",
+                                (start_date, end_date, name),
+                            )
+                            flash("방학기간을 저장했습니다.")
+                            return redirect(url_for("vacation_settings"))
+                    except ValueError:
+                        flash("방학기간 날짜 형식이 올바르지 않습니다.")
+            elif action == "delete_vacation":
+                vacation_id = request.form.get("vacation_id", "").strip()
+                if vacation_id.isdigit():
+                    execute_db("DELETE FROM school_vacations WHERE id = ?", (int(vacation_id),))
+                    flash("방학기간을 삭제했습니다.")
+                    return redirect(url_for("vacation_settings"))
+
+        vacation_rows = query_db("SELECT id, start_date, end_date, name FROM school_vacations ORDER BY start_date")
+        return render_template("settings_vacations.html", vacation_rows=vacation_rows)
 
     @app.route("/settings/holidays", methods=["GET", "POST"])
     def holiday_settings() -> str:
@@ -950,6 +1020,9 @@ def create_app() -> Flask:
         auto_holidays = get_korean_public_holidays(years)
         temp_holidays = {row["holiday_date"]: (row["name"] or "임시공휴일") for row in temp_holiday_rows}
         holidays = set(auto_holidays.keys()) | set(temp_holidays.keys())
+        today = datetime.now().date()
+        vacation_holidays = get_vacation_date_map(date(today.year - 1, 1, 1), date(today.year + 1, 12, 31))
+        holidays |= set(vacation_holidays.keys())
 
         rows = query_db(
             """
@@ -961,7 +1034,6 @@ def create_app() -> Flask:
             """
         )
 
-        today = datetime.now().date()
         tracked = []
         for row in rows:
             try:
@@ -1664,6 +1736,13 @@ def init_db() -> None:
                 name TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS school_vacations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                name TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS counsel_types (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
@@ -1719,6 +1798,44 @@ def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
         ]:
             fixed[f"{y}-{md}"] = name
     return fixed
+
+
+def get_vacation_date_map(range_start: date, range_end: date) -> dict[str, str]:
+    rows = query_db("SELECT start_date, end_date, name FROM school_vacations")
+    mapped: dict[str, str] = {}
+    for row in rows:
+        try:
+            start = date.fromisoformat(row["start_date"])
+            end = date.fromisoformat(row["end_date"])
+        except ValueError:
+            continue
+        if end < start:
+            continue
+        overlap_start = max(start, range_start)
+        overlap_end = min(end, range_end)
+        if overlap_end < overlap_start:
+            continue
+        label = row["name"] or "방학"
+        current = overlap_start
+        while current <= overlap_end:
+            mapped[current.isoformat()] = label
+            current += timedelta(days=1)
+    return mapped
+
+
+def get_vacation_dday_text(today: date) -> str:
+    rows = query_db("SELECT start_date FROM school_vacations ORDER BY start_date")
+    upcoming_days: list[int] = []
+    for row in rows:
+        try:
+            start = date.fromisoformat(row["start_date"])
+        except ValueError:
+            continue
+        if start >= today:
+            upcoming_days.append((start - today).days)
+    if not upcoming_days:
+        return ""
+    return f"방학까지 {min(upcoming_days)}일"
 
 
 def business_days_count(start: date, end: date, holiday_dates: set[str]) -> int:

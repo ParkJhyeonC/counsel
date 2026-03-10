@@ -23,10 +23,12 @@ from flask import (
     redirect,
     render_template,
     request,
+    session,
     send_file,
     send_from_directory,
     url_for,
 )
+from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
 from openpyxl import Workbook, load_workbook
 
@@ -40,6 +42,7 @@ DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
 UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
 MAX_BACKUP_FILES = 20
+LOCK_TIMEOUT_SECONDS = 30 * 60
 
 
 def validate_project_layout() -> None:
@@ -75,6 +78,36 @@ def create_app() -> Flask:
     @app.before_request
     def before_request() -> None:
         g.db = get_db()
+        security_configured = is_security_configured()
+        g.security_configured = security_configured
+
+        endpoint = request.endpoint or ""
+        exempt_endpoints = {
+            "security_setup",
+            "unlock_screen",
+            "unlock_submit",
+            "lock_now",
+            "password_reset",
+            "static",
+        }
+
+        if not security_configured and endpoint not in {"security_setup", "static"}:
+            return redirect(url_for("security_setup"))
+
+        if security_configured and endpoint not in exempt_endpoints:
+            now_ts = int(datetime.now().timestamp())
+            last_activity = int(session.get("last_activity", now_ts))
+            is_unlocked = bool(session.get("is_unlocked", False))
+
+            if is_unlocked and now_ts - last_activity > LOCK_TIMEOUT_SECONDS:
+                session["is_unlocked"] = False
+                flash("30분 이상 활동이 없어 화면이 잠겼습니다.")
+                return redirect(url_for("unlock_screen"))
+
+            if not session.get("is_unlocked", False):
+                return redirect(url_for("unlock_screen"))
+
+            session["last_activity"] = now_ts
 
     @app.teardown_request
     def teardown_request(exception: Exception | None) -> None:
@@ -238,6 +271,86 @@ def create_app() -> Flask:
             return jsonify({"ok": True, "message": "정상: API 키로 OpenAI 연결에 성공했습니다."}), 200
         except RuntimeError as exc:
             return jsonify({"ok": False, "message": str(exc)}), 200
+
+    @app.route("/setup/security", methods=["GET", "POST"])
+    def security_setup() -> str:
+        if is_security_configured():
+            return redirect(url_for("index"))
+
+        if request.method == "POST":
+            password = request.form.get("password", "")
+            password_confirm = request.form.get("password_confirm", "")
+            reset_phone = normalize_phone(request.form.get("reset_phone", ""))
+
+            if len(password) < 4:
+                flash("암호는 4자리 이상으로 설정해 주세요.")
+            elif password != password_confirm:
+                flash("암호 확인이 일치하지 않습니다.")
+            elif len(reset_phone) < 8:
+                flash("히든 넘버(전화번호)를 올바르게 입력해 주세요.")
+            else:
+                set_app_setting("screen_lock_password_hash", generate_password_hash(password))
+                set_app_setting("screen_lock_reset_phone", reset_phone)
+                session["is_unlocked"] = True
+                session["last_activity"] = int(datetime.now().timestamp())
+                flash("보안 설정이 완료되었습니다.")
+                return redirect(url_for("index"))
+
+        return render_template("security_setup.html")
+
+    @app.route("/lock", methods=["GET"])
+    def unlock_screen() -> str:
+        if not is_security_configured():
+            return redirect(url_for("security_setup"))
+        return render_template("lock_screen.html")
+
+    @app.route("/lock", methods=["POST"])
+    def unlock_submit() -> str:
+        if not is_security_configured():
+            return redirect(url_for("security_setup"))
+
+        password = request.form.get("password", "")
+        stored_hash = get_app_setting("screen_lock_password_hash", "")
+        if not stored_hash or not check_password_hash(stored_hash, password):
+            flash("암호가 올바르지 않습니다.")
+            return redirect(url_for("unlock_screen"))
+
+        session["is_unlocked"] = True
+        session["last_activity"] = int(datetime.now().timestamp())
+        flash("잠금이 해제되었습니다.")
+        return redirect(url_for("index"))
+
+    @app.route("/lock/now", methods=["POST"])
+    def lock_now() -> str:
+        session["is_unlocked"] = False
+        session["last_activity"] = int(datetime.now().timestamp())
+        flash("화면을 잠갔습니다.")
+        return redirect(url_for("unlock_screen"))
+
+    @app.route("/lock/reset", methods=["GET", "POST"])
+    def password_reset() -> str:
+        if not is_security_configured():
+            return redirect(url_for("security_setup"))
+
+        if request.method == "POST":
+            reset_phone = normalize_phone(request.form.get("reset_phone", ""))
+            password = request.form.get("password", "")
+            password_confirm = request.form.get("password_confirm", "")
+
+            if len(password) < 4:
+                flash("새 암호는 4자리 이상으로 입력해 주세요.")
+            elif password != password_confirm:
+                flash("새 암호 확인이 일치하지 않습니다.")
+            elif reset_phone != get_app_setting("screen_lock_reset_phone", ""):
+                flash("히든 넘버(전화번호)가 일치하지 않습니다.")
+            else:
+                set_app_setting("screen_lock_password_hash", generate_password_hash(password))
+                session["is_unlocked"] = True
+                session["last_activity"] = int(datetime.now().timestamp())
+                flash("암호를 재설정했습니다.")
+                return redirect(url_for("index"))
+
+        return render_template("password_reset.html")
 
 
     @app.route("/settings/school", methods=["GET", "POST"])
@@ -1747,6 +1860,25 @@ def get_app_setting(key: str, default: str = "") -> str:
     if row and row["value"] is not None:
         return str(row["value"])
     return default
+
+
+def set_app_setting(key: str, value: str) -> None:
+    execute_db(
+        """
+        INSERT INTO app_settings(key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (key, value),
+    )
+
+
+def normalize_phone(raw: str) -> str:
+    return re.sub(r"\D", "", raw or "")
+
+
+def is_security_configured() -> bool:
+    return bool(get_app_setting("screen_lock_password_hash", "").strip())
 
 
 def get_configured_openai_api_key() -> str:

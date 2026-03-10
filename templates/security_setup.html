@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>초기 보안 설정</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main style="max-width: 560px; margin-top: 3rem;">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <section class="card">
+      <h2>처음 실행: 보안 잠금 설정</h2>
+      <p class="muted">처음 한 번 암호와 히든 넘버(전화번호)를 설정해 주세요. 30분 이상 활동이 없으면 자동 잠금됩니다.</p>
+      <form method="post" class="grid-form">
+        <label class="full">암호
+          <input type="password" name="password" minlength="4" required>
+        </label>
+        <label class="full">암호 확인
+          <input type="password" name="password_confirm" minlength="4" required>
+        </label>
+        <label class="full">히든 넘버(전화번호, 암호 재설정용)
+          <input name="reset_phone" placeholder="예: 01012345678" required>
+        </label>
+        <button class="btn" type="submit">설정 완료</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

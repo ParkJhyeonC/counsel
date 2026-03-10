@@ -21,6 +21,11 @@
         <a class="nav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
         <a class="nav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
         <a class="nav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
+        {% if g.security_configured %}
+        <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;">
+          <button class="nav-link nav-link-btn" type="submit">잠금</button>
+        </form>
+        {% endif %}
       </nav>
     </div>
   </header>
@@ -38,5 +43,30 @@
 
     {% block content %}{% endblock %}
   </main>
+  {% if g.security_configured and request.endpoint not in ['unlock_screen', 'unlock_submit', 'security_setup', 'password_reset'] %}
+  <script>
+    const LOCK_TIMEOUT_MS = 30 * 60 * 1000;
+    let lockTimer = null;
+
+    async function autoLock() {
+      try {
+        await fetch('{{ url_for("lock_now") }}', { method: 'POST' });
+      } finally {
+        window.location.href = '{{ url_for("unlock_screen") }}';
+      }
+    }
+
+    function resetLockTimer() {
+      if (lockTimer) clearTimeout(lockTimer);
+      lockTimer = setTimeout(autoLock, LOCK_TIMEOUT_MS);
+    }
+
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
+      window.addEventListener(eventName, resetLockTimer, { passive: true });
+    });
+    resetLockTimer();
+  </script>
+  {% endif %}
+
 </body>
 </html>

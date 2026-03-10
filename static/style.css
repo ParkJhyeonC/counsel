@@ -54,6 +54,13 @@ body {
 .nav-link:hover { background: #eef2ff; color: #1e40af; }
 .nav-link.active { background: var(--primary-weak); color: #1d4ed8; font-weight: 600; }
 
+.nav-link-btn {
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  line-height: 1;
+}
+
 main { max-width: 1100px; margin: 1.2rem auto; padding: 0 1rem 2rem; }
 
 .card {

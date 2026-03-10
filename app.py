@@ -110,6 +110,15 @@ def create_app() -> Flask:
             (datetime.now().date().isoformat(),),
         )
         backup_files = list_backup_files()
+        absence_summary = query_db(
+            """
+            SELECT
+              SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_count,
+              SUM(CASE WHEN is_active = 1 AND home_visit_done = 0 THEN 1 ELSE 0 END) AS home_visit_pending
+            FROM unexcused_absences
+            """,
+            one=True,
+        )
         return render_template(
             "index.html",
             students=students,
@@ -120,6 +129,8 @@ def create_app() -> Flask:
             backup_files=backup_files,
             upcoming_count=len(upcoming_schedules),
             backup_count=len(backup_files),
+            active_absence_count=(absence_summary["active_count"] or 0),
+            home_visit_pending_count=(absence_summary["home_visit_pending"] or 0),
         )
 
     @app.route("/backup/create", methods=["POST"])
@@ -969,6 +980,29 @@ def create_app() -> Flask:
             grades=grades,
             grade_class_map=grade_class_map,
             counsel_types=counsel_types,
+        )
+
+    @app.route("/logs/<int:log_id>/confirmation")
+    def log_confirmation(log_id: int) -> str:
+        row = query_db(
+            """
+            SELECT l.id, l.date, l.type, l.summary, l.detail, l.counsel_period,
+                   s.id AS student_id, s.name AS student_name, s.grade, s.class_no, s.class_name
+            FROM counsel_logs l
+            JOIN students s ON s.id = l.student_id
+            WHERE l.id = ?
+            """,
+            (log_id,),
+            one=True,
+        )
+        if row is None:
+            flash("상담일지를 찾을 수 없습니다.")
+            return redirect(url_for("logs_list"))
+
+        return render_template(
+            "log_confirmation_print.html",
+            log=row,
+            printed_at=datetime.now().strftime("%Y-%m-%d"),
         )
 
     @app.route("/logs/<int:log_id>/edit", methods=["GET", "POST"])

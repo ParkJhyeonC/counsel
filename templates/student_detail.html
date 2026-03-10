@@ -79,6 +79,7 @@
   <p><strong>다음 상담일:</strong> {{ item.log.next_date }}</p>
   <div class="button-row">
     <a class="btn" href="{{ url_for('edit_log', log_id=item.log.id) }}">수정</a>
+    <a class="btn btn-secondary" href="{{ url_for('log_confirmation', log_id=item.log.id) }}" target="_blank">상담 확인증 출력</a>
     <form method="post" action="{{ url_for('delete_log', log_id=item.log.id) }}" onsubmit="return confirm('이 상담일지를 삭제할까요?');">
       <button class="btn btn-danger" type="submit">삭제</button>
     </form>

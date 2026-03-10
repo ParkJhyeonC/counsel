@@ -17,7 +17,7 @@
   </form>
 
   <table>
-    <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th><th>상세</th></tr></thead>
+    <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th><th>상세</th><th>확인증</th></tr></thead>
     <tbody>
       {% for row in logs %}
       <tr>
@@ -26,9 +26,10 @@
         <td>{{ row.type }}</td>
         <td>{{ row.summary }}</td>
         <td><a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=row.student_id) }}">열기</a></td>
+        <td><a class="btn btn-secondary" href="{{ url_for('log_confirmation', log_id=row.id) }}" target="_blank">출력</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="5">상담일지가 없습니다.</td></tr>
+      <tr><td colspan="6">상담일지가 없습니다.</td></tr>
       {% endfor %}
     </tbody>
   </table>

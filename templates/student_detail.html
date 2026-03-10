@@ -24,6 +24,13 @@
   <div class="ai-concept-grid">
     <div class="ai-panel ai-panel-gen">
       <h3>1) AI 초안 생성</h3>
+      <label class="full">사례개념화 이론 기반
+        <select id="case-concept-theory">
+          {% for theory in case_concept_theories %}
+          <option value="{{ theory.value }}" {% if theory.value == 'integrative' %}selected{% endif %}>{{ theory.label }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <div class="button-row">
         <button class="btn" type="button" id="generate-ai-case">사례개념화 초안 생성</button>
       </div>
@@ -101,6 +108,7 @@
   const resultEl = document.getElementById('ai-case-result');
   const savedEl = document.getElementById('saved-case-concept');
   const copyBtn = document.getElementById('copy-ai-to-saved');
+  const theoryEl = document.getElementById('case-concept-theory');
 
   copyBtn.addEventListener('click', () => {
     if (!resultEl.value.trim()) return;
@@ -115,7 +123,10 @@
       const resp = await fetch('{{ url_for("ai_case_conceptualization", student_id=student.id) }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: 'student_detail' })
+        body: JSON.stringify({
+          trigger: 'student_detail',
+          theory: theoryEl ? theoryEl.value : 'integrative'
+        })
       });
       const data = await resp.json();
       if (!resp.ok || !data.ok) {

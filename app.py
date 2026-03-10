@@ -43,6 +43,15 @@ UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
 BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
 MAX_BACKUP_FILES = 20
 LOCK_TIMEOUT_SECONDS = 30 * 60
+CASE_CONCEPT_THEORIES: list[dict[str, str]] = [
+    {"value": "integrative", "label": "통합적 관점(기본)", "guide": "인지·정서·행동·관계·환경 요인을 통합적으로 사례개념화하라."},
+    {"value": "cbt", "label": "인지행동치료(CBT)", "guide": "자동사고-핵심신념-행동 패턴의 연쇄와 유지기제를 중심으로 분석하라."},
+    {"value": "solution_focused", "label": "해결중심(SFBT)", "guide": "문제보다 예외, 강점, 목표, 작은 변화의 실행계획을 강조하라."},
+    {"value": "person_centered", "label": "인간중심", "guide": "공감·수용·진정성 관점에서 정서경험과 관계적 의미를 중심으로 기술하라."},
+    {"value": "reality_therapy", "label": "현실치료/선택이론", "guide": "욕구충족, 현재 선택, 책임, 실행가능한 계획(WDEP)을 중심으로 정리하라."},
+    {"value": "family_system", "label": "가족체계", "guide": "가족 상호작용, 경계, 의사소통, 반복패턴 등 체계 관점의 유지요인을 포함하라."},
+]
+
 
 
 def validate_project_layout() -> None:
@@ -186,6 +195,10 @@ def create_app() -> Flask:
         if student is None:
             return jsonify({"ok": False, "error": "학생을 찾을 수 없습니다."}), 404
 
+        payload = request.get_json(silent=True) or {}
+        selected_theory = str(payload.get("theory", "integrative")).strip().lower()
+        theory_guide = get_case_concept_theory_guide(selected_theory)
+
         provider = get_ai_provider()
         if provider == "gemini":
             api_key = get_configured_gemini_api_key()
@@ -214,6 +227,7 @@ def create_app() -> Flask:
         system_prompt = (
             "당신은 한국 고등학교 상담교사를 돕는 상담 수퍼바이저다. "
             "제공된 학생의 누적 상담기록을 종합하여 사례개념화 초안을 한국어로 작성하라. "
+            f"이론적 기반은 다음 지침을 우선 적용하라: {theory_guide} "
             "출력은 반드시 다음 항목 순서를 지켜라: "
             "1) 핵심문제 2) 경과요약(시간흐름) 3) 유지요인(개인/가정/학교/또래) "
             "4) 보호요인 5) 개입가설 6) 다음회기 질문(3개) 7) 단기개입계획(1~2주)."
@@ -1490,7 +1504,13 @@ def create_app() -> Flask:
             )
             logs_with_files.append({"log": row, "files": files})
 
-        return render_template("student_detail.html", student=student, logs=logs_with_files, case_concept=concept_row)
+        return render_template(
+            "student_detail.html",
+            student=student,
+            logs=logs_with_files,
+            case_concept=concept_row,
+            case_concept_theories=CASE_CONCEPT_THEORIES,
+        )
 
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename: str):
@@ -1931,6 +1951,13 @@ def normalize_phone(raw: str) -> str:
 
 def is_security_configured() -> bool:
     return bool(get_app_setting("screen_lock_password_hash", "").strip())
+
+
+def get_case_concept_theory_guide(theory_value: str) -> str:
+    for theory in CASE_CONCEPT_THEORIES:
+        if theory["value"] == theory_value:
+            return theory["guide"]
+    return CASE_CONCEPT_THEORIES[0]["guide"]
 
 
 def get_ai_provider() -> str:

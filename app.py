@@ -240,6 +240,35 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "message": str(exc)}), 200
 
 
+    @app.route("/settings/school", methods=["GET", "POST"])
+    def school_settings() -> str:
+        if request.method == "POST":
+            school_name = request.form.get("school_name", "").strip()
+            counselor_name = request.form.get("counselor_name", "").strip()
+
+            execute_db(
+                """
+                INSERT INTO app_settings(key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                ("school_name", school_name),
+            )
+            execute_db(
+                """
+                INSERT INTO app_settings(key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                ("counselor_name", counselor_name),
+            )
+            flash("학교 설정을 저장했습니다.")
+            return redirect(url_for("school_settings"))
+
+        school_name = get_app_setting("school_name", "정동고등학교")
+        counselor_name = get_app_setting("counselor_name", "전문상담교사")
+        return render_template("settings_school.html", school_name=school_name, counselor_name=counselor_name)
+
     @app.route("/settings/counsel-types", methods=["GET", "POST"])
     def counsel_types_settings() -> str:
         if request.method == "POST":
@@ -1003,6 +1032,8 @@ def create_app() -> Flask:
             "log_confirmation_print.html",
             log=row,
             printed_at=datetime.now().strftime("%Y-%m-%d"),
+            school_name=get_app_setting("school_name", "정동고등학교"),
+            counselor_name=get_app_setting("counselor_name", "전문상담교사"),
         )
 
     @app.route("/logs/<int:log_id>/edit", methods=["GET", "POST"])
@@ -1687,6 +1718,13 @@ def request_openai_api_health(api_key: str) -> None:
         raise RuntimeError(f"OpenAI API 키 검증 실패: {detail}") from exc
     except url_error.URLError as exc:
         raise RuntimeError("OpenAI API 연결 실패: 네트워크를 확인하세요.") from exc
+
+
+def get_app_setting(key: str, default: str = "") -> str:
+    row = query_db("SELECT value FROM app_settings WHERE key = ?", (key,), one=True)
+    if row and row["value"] is not None:
+        return str(row["value"])
+    return default
 
 
 def get_configured_openai_api_key() -> str:

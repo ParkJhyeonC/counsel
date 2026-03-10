@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>학교 설정</h2>
+  <p class="muted">여기서 설정한 학교명/전문상담교사명은 상담확인증 출력에 자동 반영됩니다.</p>
+
+  <form method="post" class="grid-form">
+    <label class="full">학교 이름
+      <input name="school_name" value="{{ school_name }}" placeholder="예: 정동고등학교" required>
+    </label>
+    <label class="full">전문상담교사
+      <input name="counselor_name" value="{{ counselor_name }}" placeholder="예: 홍길동" required>
+    </label>
+    <button class="btn" type="submit">설정 저장</button>
+  </form>
+</section>
+{% endblock %}

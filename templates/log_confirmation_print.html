@@ -28,11 +28,11 @@
     <table>
       <tr>
         <th>성명</th><td>{{ log.student_name }}</td>
-        <th>학 반</th><td>{{ log.class_no or log.class_name or '-' }}</td>
+        <th>학 반</th><td>{% if log.grade and log.class_no %}{{ log.grade }}학년 {{ log.class_no }}반{% elif log.class_name %}{{ log.class_name }}{% else %}-{% endif %}</td>
       </tr>
       <tr>
         <th>상담유형</th><td>{{ log.type }}</td>
-        <th>상담자</th><td>정동고등학교 Wee클래스</td>
+        <th>상담자</th><td>{{ counselor_name }}</td>
       </tr>
       <tr>
         <th>상담일시</th><td colspan="3">{{ log.date }} {% if log.counsel_period %}{{ log.counsel_period }}{% endif %}</td>
@@ -46,7 +46,7 @@
       상기 대상자는 Wee클래스에 내방하여<br>
       위와 같이 상담하였음을 확인합니다.<br><br>
       {{ printed_at }}<br><br>
-      <strong>정동고등학교 Wee클래스</strong>
+      <strong>{{ school_name }} Wee클래스</strong>
     </div>
   </section>
 </body>

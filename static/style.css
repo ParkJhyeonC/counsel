@@ -250,3 +250,19 @@ tr:hover td { background: #fbfdff; }
   font-weight: 700;
 }
 .warn-red { color: #b91c1c; }
+
+.day-cell.holiday { background: #fff7f7; border-color: #fecaca; }
+.holiday-chip {
+  display:inline-block;
+  margin-bottom:.2rem;
+  background:#fee2e2;
+  color:#991b1b;
+  border:1px solid #fecaca;
+  border-radius:999px;
+  padding:.08rem .35rem;
+  font-size:.72rem;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}

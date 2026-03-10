@@ -24,7 +24,7 @@
       </select>
     </label>
     <button class="btn" type="submit">조회</button>
-    <a class="btn" href="{{ url_for('stats_neis_monthly_export', year=selected_year, month=request.args.get('month', '')) }}">월간통계(나이스 업로드) 엑셀 다운로드</a>
+    <button class="btn" type="button" id="neis-export-btn">월간통계(나이스 업로드) 엑셀 다운로드</button>
     <a class="btn btn-secondary" href="{{ url_for('stats_annual_ledger', year=selected_year) }}" target="_blank">개인상담 운영대장 출력</a>
   </form>
 
@@ -55,4 +55,22 @@
     </tbody>
   </table>
 </section>
+<script>
+  const neisBtn = document.getElementById('neis-export-btn');
+  const yearInput = document.querySelector('input[name="year"]');
+  const monthSelect = document.querySelector('select[name="month"]');
+  neisBtn?.addEventListener('click', () => {
+    const year = (yearInput?.value || '').trim();
+    const month = (monthSelect?.value || '').trim();
+    if (!month) {
+      alert('월을 먼저 선택해 주세요.');
+      monthSelect?.focus();
+      return;
+    }
+    const url = new URL('{{ url_for("stats_neis_monthly_export") }}', window.location.origin);
+    if (year) url.searchParams.set('year', year);
+    url.searchParams.set('month', month);
+    window.location.href = url.toString();
+  });
+</script>
 {% endblock %}

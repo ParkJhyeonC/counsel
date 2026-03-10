@@ -73,8 +73,9 @@
 
     {% for week in calendar_weeks %}
       {% for day in week %}
-      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %}">
+      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %} {% if day.is_holiday %}holiday{% endif %}">
         <a class="day-number" href="{{ url_for('schedule', month=selected_month, date=day.date) }}">{{ day.day }}</a>
+        {% if day.is_holiday %}<div class="holiday-chip">{{ day.holiday_name }}</div>{% endif %}
         {% for item in day.schedules %}
           <div class="event-chip {{ item.status }}">
             {{ item.schedule_time or '시간미정' }} {{ item.title }}

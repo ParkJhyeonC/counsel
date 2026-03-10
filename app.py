@@ -550,6 +550,14 @@ def create_app() -> Flask:
             schedules_by_date.setdefault(day_key, []).append(dict(row))
 
         cal = Calendar(firstweekday=0)
+        calendar_dates = [d for week in cal.monthdatescalendar(calendar_year, calendar_month) for d in week]
+        holiday_years = {d.year for d in calendar_dates}
+        auto_holidays = get_korean_public_holidays(holiday_years)
+        temp_holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays")
+        holiday_map: dict[str, str] = dict(auto_holidays)
+        for row in temp_holiday_rows:
+            holiday_map[row["holiday_date"]] = row["name"] or "임시공휴일"
+
         calendar_weeks: list[list[dict[str, Any]]] = []
         for week_dates in cal.monthdatescalendar(calendar_year, calendar_month):
             week_items: list[dict[str, Any]] = []
@@ -563,6 +571,8 @@ def create_app() -> Flask:
                         "is_current_month": day_obj.month == calendar_month,
                         "is_selected": day_key == selected_date,
                         "is_today": day_key == datetime.now().date().isoformat(),
+                        "is_holiday": day_key in holiday_map,
+                        "holiday_name": holiday_map.get(day_key, ""),
                         "schedules": day_schedules[:3],
                         "extra_count": max(0, len(day_schedules) - 3),
                     }

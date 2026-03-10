@@ -841,6 +841,46 @@ def create_app() -> Flask:
             grade_class_map=grade_class_map,
         )
 
+    @app.route("/settings/holidays", methods=["GET", "POST"])
+    def holiday_settings() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "add_holiday":
+                holiday_date = request.form.get("holiday_date", "").strip()
+                holiday_name = request.form.get("holiday_name", "").strip()
+                if not holiday_date:
+                    flash("임시공휴일 날짜를 입력해 주세요.")
+                else:
+                    try:
+                        date.fromisoformat(holiday_date)
+                        execute_db(
+                            """
+                            INSERT INTO school_holidays(holiday_date, name)
+                            VALUES (?, ?)
+                            ON CONFLICT(holiday_date) DO UPDATE SET name = excluded.name
+                            """,
+                            (holiday_date, holiday_name or "공휴일"),
+                        )
+                        flash("임시공휴일을 저장했습니다.")
+                        return redirect(url_for("holiday_settings"))
+                    except ValueError:
+                        flash("임시공휴일 날짜 형식이 올바르지 않습니다.")
+            elif action == "delete_holiday":
+                holiday_date = request.form.get("holiday_date", "").strip()
+                if holiday_date:
+                    execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
+                    flash("임시공휴일을 삭제했습니다.")
+                    return redirect(url_for("holiday_settings"))
+
+        temp_holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays ORDER BY holiday_date")
+        years = {datetime.now().year}
+        auto_holidays = get_korean_public_holidays(years)
+        return render_template(
+            "settings_holidays.html",
+            temp_holiday_rows=temp_holiday_rows,
+            auto_holiday_count=len(auto_holidays),
+        )
+
     @app.route("/absence", methods=["GET", "POST"])
     def absence_tracker() -> str:
         if request.method == "POST":
@@ -864,32 +904,6 @@ def create_app() -> Flask:
                         return redirect(url_for("absence_tracker"))
                     except ValueError:
                         flash("시작일 형식이 올바르지 않습니다.")
-            elif action == "add_holiday":
-                holiday_date = request.form.get("holiday_date", "").strip()
-                holiday_name = request.form.get("holiday_name", "").strip()
-                if not holiday_date:
-                    flash("임시공휴일 날짜를 입력해 주세요.")
-                else:
-                    try:
-                        date.fromisoformat(holiday_date)
-                        execute_db(
-                            """
-                            INSERT INTO school_holidays(holiday_date, name)
-                            VALUES (?, ?)
-                            ON CONFLICT(holiday_date) DO UPDATE SET name = excluded.name
-                            """,
-                            (holiday_date, holiday_name or "공휴일"),
-                        )
-                        flash("임시공휴일을 저장했습니다.")
-                        return redirect(url_for("absence_tracker"))
-                    except ValueError:
-                        flash("임시공휴일 날짜 형식이 올바르지 않습니다.")
-            elif action == "delete_holiday":
-                holiday_date = request.form.get("holiday_date", "").strip()
-                if holiday_date:
-                    execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
-                    flash("임시공휴일을 삭제했습니다.")
-                    return redirect(url_for("absence_tracker"))
             elif action == "mark_return":
                 absence_id = request.form.get("absence_id", "").strip()
                 if absence_id.isdigit():
@@ -969,7 +983,6 @@ def create_app() -> Flask:
             "absence_tracker.html",
             students=student_rows,
             tracked=tracked,
-            temp_holiday_rows=temp_holiday_rows,
             auto_holiday_count=len(auto_holidays),
             today=today.isoformat(),
         )

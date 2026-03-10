@@ -1,0 +1,68 @@
+@echo off
+setlocal
+
+set "SCRIPT_DIR=%~dp0"
+pushd "%SCRIPT_DIR%.." >nul 2>nul || goto :error_root
+set "ROOT_DIR=%CD%"
+
+set "VENV_PY=%ROOT_DIR%\.venv\Scripts\python.exe"
+set "VENV_PIP=%ROOT_DIR%\.venv\Scripts\pip.exe"
+set "ISCC_EXE="
+
+if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set "ISCC_EXE=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+if not defined ISCC_EXE if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC_EXE=%ProgramFiles%\Inno Setup 6\ISCC.exe"
+
+echo [INFO] Windows setup build helper
+echo [INFO] Root: %ROOT_DIR%
+
+if not exist "%VENV_PY%" (
+  echo [INFO] .venv not found. Running scripts\run.bat once to bootstrap...
+  call "%ROOT_DIR%\scripts\run.bat"
+  if errorlevel 1 goto :error
+)
+
+if not exist "%VENV_PIP%" (
+  echo [ERROR] venv pip not found: %VENV_PIP%
+  goto :error
+)
+
+echo [INFO] Installing build dependency: pyinstaller
+"%VENV_PIP%" install pyinstaller
+if errorlevel 1 goto :error
+
+echo [INFO] Building standalone app folder with PyInstaller...
+if exist "%ROOT_DIR%\build" rmdir /s /q "%ROOT_DIR%\build"
+if exist "%ROOT_DIR%\dist" rmdir /s /q "%ROOT_DIR%\dist"
+if exist "%ROOT_DIR%\Counsel.spec" del /q "%ROOT_DIR%\Counsel.spec"
+
+"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name Counsel --onedir --add-data "templates;templates" --add-data "static;static" app.py
+if errorlevel 1 goto :error
+
+if defined ISCC_EXE (
+  echo [INFO] Inno Setup detected. Building Setup.exe...
+  "%ISCC_EXE%" "%ROOT_DIR%\installer\counsel_setup.iss"
+  if errorlevel 1 goto :error
+  echo [DONE] Setup created: %ROOT_DIR%\dist\CounselSetup.exe
+) else (
+  echo [WARN] Inno Setup 6 not found. Portable build only.
+  echo [DONE] Portable app folder: %ROOT_DIR%\dist\Counsel
+  echo [HINT] Install Inno Setup 6, then rerun this script to generate Setup.exe
+)
+
+goto :done
+
+:error_root
+echo [ERROR] Cannot access project root from scripts folder.
+goto :error
+
+:error
+echo.
+echo [ERROR] Build failed.
+exit /b 1
+
+:done
+popd >nul 2>nul
+echo.
+echo [HINT] Press any key to close this window...
+pause >nul
+exit /b 0

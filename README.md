@@ -77,6 +77,26 @@ dir templates
 - **중요:** 오류 화면의 경로가 `...\templates\app.py`처럼 나오면, 잘못된 위치의 `app.py`를 실행한 것입니다.  
   반드시 `c:\프로젝트폴더\app.py` 형태(루트)에 있어야 하며, `templates` 폴더 안에 `app.py`가 있으면 안 됩니다.
 
+
+## Windows 설치 파일(Setup.exe) 만들기
+Windows 사용자 배포가 필요하면 설치 파일도 만들 수 있습니다.
+
+1. (권장) Inno Setup 6 설치: https://jrsoftware.org/isinfo.php
+2. 아래 스크립트 실행:
+```bat
+scripts\build_setup_windows.bat
+```
+
+스크립트가 자동으로 수행하는 작업:
+- `.venv` 확인(없으면 실행 환경 부트스트랩)
+- `pyinstaller` 설치
+- 실행 파일 폴더 빌드 (`dist\Counsel`)
+- Inno Setup이 설치된 경우 설치 파일 생성 (`dist\CounselSetup.exe`)
+
+> Inno Setup이 없는 경우에도 `dist\Counsel` 폴더로 포터블 실행은 가능합니다.
+
+---
+
 ## AI 사례개념화 보조 사용법 (선택)
 
 학생 상세 화면(`students/<id>`)에서 **사례개념화 초안 생성** 버튼을 사용할 수 있습니다.

@@ -1,7 +1,7 @@
-#define MyAppName "Counsel"
+#define MyAppName "counselog"
 #define MyAppVersion "1.0.0"
-#define MyAppPublisher "School Counseling"
-#define MyAppExeName "Counsel.exe"
+#define MyAppPublisher "전문상담교사 박재현"
+#define MyAppExeName "counselog.exe"
 
 [Setup]
 AppId={{9DEB1AB8-7B73-4E0F-9B3C-EF65E0E5B401}
@@ -11,7 +11,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=..\dist
-OutputBaseFilename=CounselSetup
+OutputBaseFilename=counselog_setup
 Compression=lzma
 SolidCompression=yes
 ArchitecturesInstallIn64BitMode=x64compatible
@@ -24,7 +24,7 @@ Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "desktopicon"; Description: "바탕화면 바로가기 생성"; GroupDescription: "추가 작업:"; Flags: unchecked
 
 [Files]
-Source: "..\dist\Counsel\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\counselog\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

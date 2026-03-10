@@ -1,4 +1,4 @@
-# counsel - 고등학교 상담일지 관리 프로그램
+# counselog - 고등학교 카운슬로그 프로그램
 
 로컬 드라이브(PC)에서 실행하는 **상담일지 저장 및 관리 웹앱**입니다.
 
@@ -52,7 +52,7 @@ scripts\run.bat
 
 
 ### Windows에서 VS Code 터미널 실행 팁
-- **프로젝트 루트 폴더**(`...\counsel`)에서 `scripts\run.bat` 를 실행하세요.
+- **프로젝트 루트 폴더**(`...\counselog`)에서 `scripts\run.bat` 를 실행하세요.
 - 경로 인식 오류가 나면 아래처럼 현재 위치를 먼저 확인하세요.
 ```bat
 cd
@@ -90,10 +90,10 @@ scripts\build_setup_windows.bat
 스크립트가 자동으로 수행하는 작업:
 - `.venv` 확인(없으면 실행 환경 부트스트랩)
 - `pyinstaller` 설치
-- 실행 파일 폴더 빌드 (`dist\Counsel`)
-- Inno Setup이 설치된 경우 설치 파일 생성 (`dist\CounselSetup.exe`)
+- 실행 파일 폴더 빌드 (`dist\counselog`)
+- Inno Setup이 설치된 경우 설치 파일 생성 (`dist\counselog_setup.exe`)
 
-> Inno Setup이 없는 경우에도 `dist\Counsel` 폴더로 포터블 실행은 가능합니다.
+> Inno Setup이 없는 경우에도 `dist\counselog` 폴더로 포터블 실행은 가능합니다.
 
 ---
 

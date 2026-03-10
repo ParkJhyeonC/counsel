@@ -33,19 +33,19 @@ if errorlevel 1 goto :error
 echo [INFO] Building standalone app folder with PyInstaller...
 if exist "%ROOT_DIR%\build" rmdir /s /q "%ROOT_DIR%\build"
 if exist "%ROOT_DIR%\dist" rmdir /s /q "%ROOT_DIR%\dist"
-if exist "%ROOT_DIR%\Counsel.spec" del /q "%ROOT_DIR%\Counsel.spec"
+if exist "%ROOT_DIR%\counselog.spec" del /q "%ROOT_DIR%\counselog.spec"
 
-"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name Counsel --onedir --add-data "templates;templates" --add-data "static;static" app.py
+"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --add-data "templates;templates" --add-data "static;static" app.py
 if errorlevel 1 goto :error
 
 if defined ISCC_EXE (
   echo [INFO] Inno Setup detected. Building Setup.exe...
   "%ISCC_EXE%" "%ROOT_DIR%\installer\counsel_setup.iss"
   if errorlevel 1 goto :error
-  echo [DONE] Setup created: %ROOT_DIR%\dist\CounselSetup.exe
+  echo [DONE] Setup created: %ROOT_DIR%\dist\counselog_setup.exe
 ) else (
   echo [WARN] Inno Setup 6 not found. Portable build only.
-  echo [DONE] Portable app folder: %ROOT_DIR%\dist\Counsel
+  echo [DONE] Portable app folder: %ROOT_DIR%\dist\counselog
   echo [HINT] Install Inno Setup 6, then rerun this script to generate Setup.exe
 )
 

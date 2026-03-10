@@ -14,12 +14,12 @@
     <p class="kpi-value">{{ upcoming_count }}</p>
   </article>
   <article class="card kpi-card mini-calendar-card">
-    <p class="kpi-label">미니 상담 달력 ({{ mini_month_title }})</p>
+    <p class="kpi-label"><a class="mini-calendar-title" href="{{ url_for('schedule', month=mini_month_key, date=mini_today_iso) }}">{{ mini_month_title }}</a></p>
     <div class="mini-cal-grid">
-      <div class="mini-head">월</div><div class="mini-head">화</div><div class="mini-head">수</div><div class="mini-head">목</div><div class="mini-head">금</div><div class="mini-head saturday">토</div><div class="mini-head sunday">일</div>
+      <div class="mini-head sunday">일</div><div class="mini-head">월</div><div class="mini-head">화</div><div class="mini-head">수</div><div class="mini-head">목</div><div class="mini-head">금</div><div class="mini-head saturday">토</div>
       {% for week in mini_calendar_weeks %}
         {% for d in week %}
-        <div class="mini-day {% if not d.is_current_month %}outside{% endif %} {% if d.is_today %}today{% endif %} {% if d.is_holiday %}holiday{% endif %} {% if d.is_saturday %}saturday{% endif %} {% if d.is_sunday %}sunday{% endif %}">{{ d.day }}</div>
+        <a class="mini-day {% if not d.is_current_month %}outside{% endif %} {% if d.is_today %}today{% endif %} {% if d.is_holiday %}holiday{% endif %} {% if d.is_saturday %}saturday{% endif %} {% if d.is_sunday %}sunday{% endif %}" href="{{ url_for('schedule', month=d.date[:7], date=d.date) }}">{{ d.day }}</a>
         {% endfor %}
       {% endfor %}
     </div>

@@ -166,7 +166,7 @@ def create_app() -> Flask:
 
         mini_today = datetime.now().date()
         mini_year, mini_month = mini_today.year, mini_today.month
-        mini_cal = Calendar(firstweekday=0)
+        mini_cal = Calendar(firstweekday=6)
         mini_weeks: list[list[dict[str, Any]]] = []
         mini_dates = [d for week in mini_cal.monthdatescalendar(mini_year, mini_month) for d in week]
         mini_holiday_years = {d.year for d in mini_dates}
@@ -182,6 +182,7 @@ def create_app() -> Flask:
                 iso = d.isoformat()
                 is_sunday = d.weekday() == 6
                 week_items.append({
+                    "date": iso,
                     "day": d.day,
                     "is_current_month": d.month == mini_month,
                     "is_today": d == mini_today,
@@ -211,6 +212,8 @@ def create_app() -> Flask:
             upcoming_count=len(upcoming_schedules),
             mini_calendar_weeks=mini_weeks,
             mini_month_title=f"{mini_year}년 {mini_month}월",
+            mini_month_key=f"{mini_year:04d}-{mini_month:02d}",
+            mini_today_iso=mini_today.isoformat(),
             active_absence_count=(absence_summary["active_count"] or 0),
             home_visit_pending_count=(absence_summary["home_visit_pending"] or 0),
         )
@@ -812,7 +815,7 @@ def create_app() -> Flask:
             month_counts[day_key] = month_counts.get(day_key, 0) + 1
             schedules_by_date.setdefault(day_key, []).append(dict(row))
 
-        cal = Calendar(firstweekday=0)
+        cal = Calendar(firstweekday=6)
         calendar_dates = [d for week in cal.monthdatescalendar(calendar_year, calendar_month) for d in week]
         holiday_years = {d.year for d in calendar_dates}
         auto_holidays = get_korean_public_holidays(holiday_years)
@@ -1835,7 +1838,7 @@ def get_vacation_dday_text(today: date) -> str:
             upcoming_days.append((start - today).days)
     if not upcoming_days:
         return ""
-    return f"방학까지 {min(upcoming_days)}일"
+    return f"D-{min(upcoming_days)}일"
 
 
 def business_days_count(start: date, end: date, holiday_dates: set[str]) -> int:

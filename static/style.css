@@ -40,7 +40,7 @@ body {
   gap: 1rem;
   align-items: center;
 }
-.brand-block { display:flex; flex-direction:column; gap:.1rem; min-width: 280px; }
+.brand-block { display:flex; align-items:baseline; gap:.35rem; min-width: 280px; }
 .logo { margin: 0; font-size: 1.35rem; font-weight: 800; letter-spacing: -.01em; white-space: nowrap; }
 .logo a { color: #0f172a; text-decoration: none; }
 .logo-sub { margin: 0; color: #64748b; font-size: .78rem; }
@@ -349,15 +349,10 @@ tr:hover td { background: #fbfdff; }
 
 
 .vacation-dday {
-  display: inline-block;
-  margin-top: .1rem;
-  font-size: .78rem;
+  margin-left: .35rem;
+  font-size: .72rem;
   font-weight: 700;
   color: #b91c1c;
-  background: #fee2e2;
-  border: 1px solid #fecaca;
-  border-radius: 999px;
-  padding: .15rem .5rem;
 }
 
 .week-label.saturday, .day-cell.saturday .day-number { color: #1d4ed8; }
@@ -386,3 +381,12 @@ tr:hover td { background: #fbfdff; }
 .mini-day.holiday { background: #fee2e2; color: #b91c1c; }
 .mini-day.saturday { color: #1d4ed8; }
 .mini-day.sunday { color: #b91c1c; }
+
+
+.mini-calendar-title {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 700;
+}
+.mini-calendar-title:hover { text-decoration: underline; }
+.mini-day { text-decoration: none; }

@@ -391,3 +391,11 @@ tr:hover td { background: #fbfdff; }
 }
 .mini-calendar-title:hover { text-decoration: underline; }
 .mini-day { text-decoration: none; }
+
+
+.provider-credit {
+  margin-top: 1.2rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: .82rem;
+}

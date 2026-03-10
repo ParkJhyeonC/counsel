@@ -108,9 +108,10 @@ def create_app() -> Flask:
             last_activity = int(session.get("last_activity", now_ts))
             is_unlocked = bool(session.get("is_unlocked", False))
 
-            if is_unlocked and now_ts - last_activity > LOCK_TIMEOUT_SECONDS:
+            lock_timeout_seconds = get_lock_timeout_seconds()
+            if is_unlocked and now_ts - last_activity > lock_timeout_seconds:
                 session["is_unlocked"] = False
-                flash("30분 이상 활동이 없어 화면이 잠겼습니다.")
+                flash(f"{lock_timeout_seconds // 60}분 이상 활동이 없어 화면이 잠겼습니다.")
                 return redirect(url_for("unlock_screen"))
 
             if not session.get("is_unlocked", False):
@@ -133,6 +134,7 @@ def create_app() -> Flask:
             "school_name_global": school_name,
             "app_title": app_title,
             "vacation_dday_text": vacation_dday_text,
+            "lock_timeout_minutes": get_lock_timeout_seconds() // 60,
         }
 
     @app.route("/")
@@ -296,7 +298,7 @@ def create_app() -> Flask:
 
     @app.route("/settings")
     def settings_index() -> str:
-        return render_template("settings_index.html")
+        return redirect(url_for("school_settings"))
 
     @app.route("/settings/ai", methods=["GET", "POST"])
     def ai_settings() -> str:
@@ -464,6 +466,46 @@ def create_app() -> Flask:
                 return redirect(url_for("index"))
 
         return render_template("password_reset.html")
+
+
+    @app.route("/settings/lock", methods=["GET", "POST"])
+    def lock_settings() -> str:
+        if not is_security_configured():
+            return redirect(url_for("security_setup"))
+
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "change_password":
+                current_password = request.form.get("current_password", "")
+                new_password = request.form.get("new_password", "")
+                new_password_confirm = request.form.get("new_password_confirm", "")
+                stored_hash = get_app_setting("screen_lock_password_hash", "")
+
+                if not check_password_hash(stored_hash, current_password):
+                    flash("현재 비밀번호가 올바르지 않습니다.")
+                elif len(new_password) < 4:
+                    flash("새 비밀번호는 4자리 이상이어야 합니다.")
+                elif new_password != new_password_confirm:
+                    flash("새 비밀번호 확인이 일치하지 않습니다.")
+                else:
+                    set_app_setting("screen_lock_password_hash", generate_password_hash(new_password))
+                    flash("잠금 비밀번호를 변경했습니다.")
+                    return redirect(url_for("lock_settings"))
+
+            elif action == "set_timeout":
+                timeout_text = request.form.get("lock_timeout_minutes", "").strip()
+                if not timeout_text.isdigit():
+                    flash("잠금 카운트다운 시간은 숫자로 입력해 주세요.")
+                else:
+                    minutes = int(timeout_text)
+                    if minutes < 1 or minutes > 240:
+                        flash("잠금 카운트다운 시간은 1~240분 사이로 입력해 주세요.")
+                    else:
+                        set_app_setting("screen_lock_timeout_minutes", str(minutes))
+                        flash("잠금 카운트다운 시간을 저장했습니다.")
+                        return redirect(url_for("lock_settings"))
+
+        return render_template("settings_lock.html", lock_timeout_minutes=get_lock_timeout_seconds() // 60)
 
 
     @app.route("/settings/school", methods=["GET", "POST"])
@@ -2147,6 +2189,15 @@ def normalize_schedule_slots(raw_text: str) -> list[str]:
 def get_schedule_slots() -> list[str]:
     stored = get_app_setting("schedule_slots", "")
     return normalize_schedule_slots(stored)
+
+
+def get_lock_timeout_seconds() -> int:
+    raw = get_app_setting("screen_lock_timeout_minutes", "30").strip()
+    if raw.isdigit():
+        minutes = max(1, min(240, int(raw)))
+    else:
+        minutes = 30
+    return minutes * 60
 
 
 def get_app_setting(key: str, default: str = "") -> str:

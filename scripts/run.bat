@@ -38,6 +38,7 @@ python -c "from app import init_db; init_db(); print('[INFO] DB initialization O
 echo [INFO] Starting app: http://localhost:5000
 start "" http://localhost:5000
 python app.py
+echo [INFO] 전문상담교사 박재현 제공
 exit /b %errorlevel%
 
 :error_root
@@ -53,6 +54,7 @@ goto :error
 
 :error
 echo.
+echo [INFO] 전문상담교사 박재현 제공
 echo [HINT] Press any key to close this window...
 pause >nul
 exit /b 1

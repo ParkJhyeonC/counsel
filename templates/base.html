@@ -20,7 +20,7 @@
         <a class="nav-link {% if request.path.startswith('/logs') and not request.path.startswith('/logs/new') %}active{% endif %}" href="{{ url_for('logs_list') }}">상담일지 확인</a>
         <a class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}" href="{{ url_for('absence_tracker') }}">미인정결석 관리</a>
         <a class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}" href="{{ url_for('stats') }}">상담 통계</a>
-        <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('settings_index') }}">설정</a>
+        <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('school_settings') }}">설정</a>
         {% if g.security_configured %}
         <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
           <button class="nav-link nav-link-btn" type="submit" title="잠금">🔒</button>
@@ -34,11 +34,11 @@
   {% if request.path == '/settings' or request.path.startswith('/settings/') %}
   <div class="settings-subnav-wrap">
     <div class="settings-subnav">
-      <a class="subnav-link {% if request.path == '/settings' %}active{% endif %}" href="{{ url_for('settings_index') }}">설정 홈</a>
-      <a class="subnav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
+            <a class="subnav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
       <a class="subnav-link {% if request.path.startswith('/settings/schedule-slots') %}active{% endif %}" href="{{ url_for('schedule_slots_settings') }}">시간/교시 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/lock') %}active{% endif %}" href="{{ url_for('lock_settings') }}">잠금설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/holidays') %}active{% endif %}" href="{{ url_for('holiday_settings') }}">임시공휴일 설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/vacations') %}active{% endif %}" href="{{ url_for('vacation_settings') }}">방학기간 설정</a>
     </div>
@@ -60,7 +60,7 @@
   </main>
   {% if g.security_configured and request.endpoint not in ['unlock_screen', 'unlock_submit', 'security_setup', 'password_reset'] %}
   <script>
-    const LOCK_TIMEOUT_MS = 30 * 60 * 1000;
+    const LOCK_TIMEOUT_MS = {{ lock_timeout_minutes }} * 60 * 1000;
     let lockTimer = null;
     let countdownTimer = null;
     let remainingMs = LOCK_TIMEOUT_MS;

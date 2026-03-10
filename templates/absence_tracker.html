@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>미인정결석 관리</h2>
+      <p class="muted">평일만 자동 카운트하며, 등록된 공휴일은 제외됩니다.</p>
+    </div>
+  </div>
+  <form method="post" class="search-form">
+    <input type="hidden" name="action" value="add_absence">
+    <label>학생
+      <select name="student_id" required>
+        <option value="">선택</option>
+        {% for s in students %}
+        <option value="{{ s.id }}">{{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>시작일 <input type="date" name="start_date" value="{{ today }}" required></label>
+    <button class="btn" type="submit">등록</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>공휴일 설정</h2>
+  <form method="post" class="search-form">
+    <input type="hidden" name="action" value="add_holiday">
+    <label>공휴일 <input type="date" name="holiday_date" required></label>
+    <label>이름 <input name="holiday_name" placeholder="예: 대체공휴일"></label>
+    <button class="btn" type="submit">저장</button>
+  </form>
+  <div class="button-row">
+    {% for h in holiday_rows %}
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="delete_holiday">
+      <input type="hidden" name="holiday_date" value="{{ h.holiday_date }}">
+      <button type="submit" class="btn btn-secondary">{{ h.holiday_date }} {{ h.name or '공휴일' }} 삭제</button>
+    </form>
+    {% else %}
+    <p class="muted">등록된 공휴일이 없습니다.</p>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>대상자 현황</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in tracked %}
+      <tr>
+        <td>{{ item.row.grade or '-' }}학년 {{ item.row.class_no or item.row.class_name or '-' }}반 {{ item.row.student_name }}</td>
+        <td>{{ item.row.start_date }}</td>
+        <td>
+          <span class="absence-count" style="background: rgba(220, 38, 38, {{ 0.12 + item.danger_ratio * 0.55 }}); border-color: rgba(185, 28, 28, {{ 0.2 + item.danger_ratio * 0.6 }});">
+            {{ item.absence_days }}일
+          </span>
+        </td>
+        <td>
+          {% if item.is_home_visit_due %}
+            {% if item.row.home_visit_done %}
+              <span class="visit-done">완료</span>
+            {% else %}
+              <form method="post" action="{{ url_for('mark_home_visit', absence_id=item.row.id) }}" class="inline-form">
+                <button class="btn" type="submit">가정방문 처리</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <span class="muted">2일차 전</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.is_report_due %}
+            <strong class="warn-red">교육청 보고 필요</strong>
+          {% else %}
+            <span class="muted">{{ 7 - item.absence_days }}일 남음</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">등록된 대상이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

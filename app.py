@@ -10,7 +10,7 @@ from urllib import request as url_request
 import json
 from io import BytesIO
 from calendar import Calendar, monthrange
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -598,6 +598,115 @@ def create_app() -> Flask:
             grade_class_map=grade_class_map,
         )
 
+    @app.route("/absence", methods=["GET", "POST"])
+    def absence_tracker() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "add_absence":
+                student_id = request.form.get("student_id", "").strip()
+                start_date = request.form.get("start_date", "").strip()
+                if not student_id or not student_id.isdigit() or not start_date:
+                    flash("학생과 시작일을 입력해 주세요.")
+                else:
+                    try:
+                        date.fromisoformat(start_date)
+                        execute_db(
+                            """
+                            INSERT INTO unexcused_absences(student_id, start_date, home_visit_done, created_at)
+                            VALUES (?, ?, 0, ?)
+                            """,
+                            (int(student_id), start_date, datetime.now().isoformat(timespec="seconds")),
+                        )
+                        flash("미인정결석 학생을 등록했습니다.")
+                        return redirect(url_for("absence_tracker"))
+                    except ValueError:
+                        flash("시작일 형식이 올바르지 않습니다.")
+            elif action == "add_holiday":
+                holiday_date = request.form.get("holiday_date", "").strip()
+                holiday_name = request.form.get("holiday_name", "").strip()
+                if not holiday_date:
+                    flash("공휴일 날짜를 입력해 주세요.")
+                else:
+                    try:
+                        date.fromisoformat(holiday_date)
+                        execute_db(
+                            """
+                            INSERT INTO school_holidays(holiday_date, name)
+                            VALUES (?, ?)
+                            ON CONFLICT(holiday_date) DO UPDATE SET name = excluded.name
+                            """,
+                            (holiday_date, holiday_name or "공휴일"),
+                        )
+                        flash("공휴일을 저장했습니다.")
+                        return redirect(url_for("absence_tracker"))
+                    except ValueError:
+                        flash("공휴일 날짜 형식이 올바르지 않습니다.")
+            elif action == "delete_holiday":
+                holiday_date = request.form.get("holiday_date", "").strip()
+                if holiday_date:
+                    execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
+                    flash("공휴일을 삭제했습니다.")
+                    return redirect(url_for("absence_tracker"))
+
+        student_rows = query_db(
+            "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"
+        )
+        holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays ORDER BY holiday_date")
+        holidays = {row["holiday_date"] for row in holiday_rows}
+
+        rows = query_db(
+            """
+            SELECT a.id, a.student_id, a.start_date, a.home_visit_done, a.home_visit_done_at, a.created_at,
+                   s.student_no, s.name AS student_name, s.grade, s.class_no, s.class_name
+            FROM unexcused_absences a
+            JOIN students s ON s.id = a.student_id
+            ORDER BY a.start_date ASC, a.id DESC
+            """
+        )
+
+        today = datetime.now().date()
+        tracked = []
+        for row in rows:
+            try:
+                start = date.fromisoformat(row["start_date"])
+            except ValueError:
+                continue
+            absence_days = business_days_count(start, today, holidays)
+            danger_ratio = min(max(absence_days / 7.0, 0), 1)
+            tracked.append({
+                "row": row,
+                "absence_days": absence_days,
+                "is_report_due": absence_days >= 7,
+                "is_home_visit_due": absence_days >= 2,
+                "danger_ratio": danger_ratio,
+            })
+
+        return render_template(
+            "absence_tracker.html",
+            students=student_rows,
+            tracked=tracked,
+            holiday_rows=holiday_rows,
+            today=today.isoformat(),
+        )
+
+    @app.route("/absence/<int:absence_id>/home-visit", methods=["POST"])
+    def mark_home_visit(absence_id: int) -> str:
+        row = query_db("SELECT id, home_visit_done FROM unexcused_absences WHERE id = ?", (absence_id,), one=True)
+        if row is None:
+            flash("대상을 찾을 수 없습니다.")
+            return redirect(url_for("absence_tracker"))
+
+        if row["home_visit_done"]:
+            flash("이미 가정방문 완료로 처리되었습니다.")
+            return redirect(url_for("absence_tracker"))
+
+        execute_db(
+            "UPDATE unexcused_absences SET home_visit_done = 1, home_visit_done_at = ? WHERE id = ?",
+            (datetime.now().isoformat(timespec="seconds"), absence_id),
+        )
+        flash("가정방문 완료 처리되었습니다.")
+        return redirect(url_for("absence_tracker"))
+
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:
         if request.method == "POST":
@@ -1157,6 +1266,21 @@ def init_db() -> None:
                 FOREIGN KEY(student_id) REFERENCES students(id)
             );
 
+            CREATE TABLE IF NOT EXISTS unexcused_absences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                student_id INTEGER NOT NULL,
+                start_date TEXT NOT NULL,
+                home_visit_done INTEGER NOT NULL DEFAULT 0,
+                home_visit_done_at TEXT,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY(student_id) REFERENCES students(id)
+            );
+
+            CREATE TABLE IF NOT EXISTS school_holidays (
+                holiday_date TEXT PRIMARY KEY,
+                name TEXT
+            );
+
             CREATE TABLE IF NOT EXISTS counsel_types (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
@@ -1182,6 +1306,19 @@ def add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, col
     existing = {row[1] for row in rows}
     if column not in existing:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
+def business_days_count(start: date, end: date, holiday_dates: set[str]) -> int:
+    if end < start:
+        return 0
+    count = 0
+    current = start
+    while current <= end:
+        iso = current.isoformat()
+        if current.weekday() < 5 and iso not in holiday_dates:
+            count += 1
+        current += timedelta(days=1)
+    return count
 
 
 def parse_grade_class_from_text(text: str) -> tuple[str, str]:

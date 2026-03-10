@@ -2,29 +2,56 @@
 {% block content %}
 <section class="card">
   <h2>AI 설정</h2>
-  <p class="muted">웹앱에 API 키를 저장하면 학생 상세 페이지의 사례개념화 보조 기능에서 사용됩니다.</p>
+  <p class="muted">기본 AI 제공자(OpenAI / Gemini)와 API 키를 설정하면 학생 상세 페이지의 사례개념화 보조 기능에서 사용됩니다.</p>
+
+  <form method="post" class="grid-form" style="margin-bottom:.8rem;">
+    <input type="hidden" name="action" value="set_provider">
+    <label class="full">기본 AI 제공자
+      <select name="provider">
+        <option value="openai" {% if ai_provider == 'openai' %}selected{% endif %}>OpenAI</option>
+        <option value="gemini" {% if ai_provider == 'gemini' %}selected{% endif %}>Gemini</option>
+      </select>
+    </label>
+    <button class="btn" type="submit">제공자 저장</button>
+  </form>
 
   <table>
-    <tr><th>현재 활성 키 소스</th><td>{{ active_source }}</td></tr>
-    <tr><th>웹앱 저장 키</th><td>{% if has_stored_key %}저장됨 ({{ key_masked }}){% else %}없음{% endif %}</td></tr>
-    <tr><th>환경변수 키(OPENAI_API_KEY)</th><td>{% if has_env_key %}감지됨{% else %}없음{% endif %}</td></tr>
+    <tr><th>현재 기본 제공자</th><td>{{ 'OpenAI' if ai_provider == 'openai' else 'Gemini' }}</td></tr>
+    <tr><th>OpenAI 웹앱 저장 키</th><td>{% if has_openai_stored_key %}저장됨 ({{ openai_key_masked }}){% else %}없음{% endif %}</td></tr>
+    <tr><th>OpenAI 환경변수 키(OPENAI_API_KEY)</th><td>{% if has_openai_env_key %}감지됨{% else %}없음{% endif %}</td></tr>
+    <tr><th>Gemini 웹앱 저장 키</th><td>{% if has_gemini_stored_key %}저장됨 ({{ gemini_key_masked }}){% else %}없음{% endif %}</td></tr>
+    <tr><th>Gemini 환경변수 키(GEMINI_API_KEY)</th><td>{% if has_gemini_env_key %}감지됨{% else %}없음{% endif %}</td></tr>
     <tr><th>활성화 테스트</th><td id="ai-key-status">미확인 (아래 버튼으로 확인)</td></tr>
   </table>
 
   <div class="button-row" style="margin-top:.7rem;">
     <button class="btn" type="button" id="validate-ai-key">AI 키 활성화 테스트</button>
-    <a class="btn btn-secondary" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API 키 발급받기</a>
+    <a class="btn btn-secondary" href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI API 키 발급</a>
+    <a class="btn btn-secondary" href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Gemini API 키 발급</a>
   </div>
 </section>
 
 <section class="card">
   <h2>OpenAI API 키 등록/수정</h2>
   <form method="post" class="grid-form">
-    <label class="full">API 키
-      <input type="password" name="api_key" placeholder="sk-..." autocomplete="off">
+    <input type="hidden" name="action" value="save_openai">
+    <label class="full">OpenAI API 키
+      <input type="password" name="openai_api_key" placeholder="sk-..." autocomplete="off">
     </label>
-    <button class="btn" type="submit" name="action" value="save">저장</button>
-    <button class="btn" type="submit" name="action" value="clear">저장 키 삭제</button>
+    <button class="btn" type="submit">저장</button>
+    <button class="btn" type="submit" name="action" value="clear_openai">저장 키 삭제</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>Gemini API 키 등록/수정</h2>
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="save_gemini">
+    <label class="full">Gemini API 키
+      <input type="password" name="gemini_api_key" placeholder="AIza..." autocomplete="off">
+    </label>
+    <button class="btn" type="submit">저장</button>
+    <button class="btn" type="submit" name="action" value="clear_gemini">저장 키 삭제</button>
   </form>
   <p class="muted">주의: 키는 로컬 DB(app_settings 테이블)에 평문으로 저장됩니다. 개인 PC에서만 사용하세요.</p>
 </section>
@@ -42,7 +69,7 @@
       const resp = await fetch('{{ url_for("ai_settings_validate") }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ check: true })
+        body: JSON.stringify({ provider: '{{ ai_provider }}' })
       });
       const data = await resp.json();
       if (data.ok) {

@@ -186,9 +186,15 @@ def create_app() -> Flask:
         if student is None:
             return jsonify({"ok": False, "error": "학생을 찾을 수 없습니다."}), 404
 
-        api_key = get_configured_openai_api_key()
-        if not api_key:
-            return jsonify({"ok": False, "error": "활성화된 OpenAI API 키가 없습니다. AI 설정에서 키를 등록하세요."}), 503
+        provider = get_ai_provider()
+        if provider == "gemini":
+            api_key = get_configured_gemini_api_key()
+            if not api_key:
+                return jsonify({"ok": False, "error": "활성화된 Gemini API 키가 없습니다. AI 설정에서 키를 등록하세요."}), 503
+        else:
+            api_key = get_configured_openai_api_key()
+            if not api_key:
+                return jsonify({"ok": False, "error": "활성화된 OpenAI API 키가 없습니다. AI 설정에서 키를 등록하세요."}), 503
 
         log_rows = query_db(
             """
@@ -214,11 +220,18 @@ def create_app() -> Flask:
         )
 
         try:
-            result_text = request_openai_case_conceptualization(
-                api_key=api_key,
-                system_prompt=system_prompt,
-                user_prompt=case_context,
-            )
+            if provider == "gemini":
+                result_text = request_gemini_case_conceptualization(
+                    api_key=api_key,
+                    system_prompt=system_prompt,
+                    user_prompt=case_context,
+                )
+            else:
+                result_text = request_openai_case_conceptualization(
+                    api_key=api_key,
+                    system_prompt=system_prompt,
+                    user_prompt=case_context,
+                )
             return jsonify({"ok": True, "result": result_text})
         except RuntimeError as exc:
             return jsonify({"ok": False, "error": str(exc)}), 502
@@ -227,45 +240,84 @@ def create_app() -> Flask:
     @app.route("/settings/ai", methods=["GET", "POST"])
     def ai_settings() -> str:
         if request.method == "POST":
-            action = request.form.get("action", "save").strip()
-            if action == "clear":
+            action = request.form.get("action", "").strip()
+
+            if action == "set_provider":
+                provider = request.form.get("provider", "openai").strip().lower()
+                if provider not in {"openai", "gemini"}:
+                    flash("지원하지 않는 AI 제공자입니다.")
+                else:
+                    set_app_setting("ai_provider", provider)
+                    flash(f"기본 AI 제공자를 {'OpenAI' if provider == 'openai' else 'Gemini'}로 설정했습니다.")
+                return redirect(url_for("ai_settings"))
+
+            if action == "clear_openai":
                 execute_db("DELETE FROM app_settings WHERE key = ?", ("openai_api_key",))
                 flash("OpenAI API 키를 삭제했습니다.")
-            else:
-                api_key = request.form.get("api_key", "").strip()
+                return redirect(url_for("ai_settings"))
+
+            if action == "save_openai":
+                api_key = request.form.get("openai_api_key", "").strip()
                 if not api_key:
-                    flash("API 키를 입력해주세요.")
-                    return redirect(url_for("ai_settings"))
+                    flash("OpenAI API 키를 입력해주세요.")
+                else:
+                    set_app_setting("openai_api_key", api_key)
+                    flash("OpenAI API 키를 저장했습니다.")
+                return redirect(url_for("ai_settings"))
 
-                execute_db(
-                    """
-                    INSERT INTO app_settings(key, value)
-                    VALUES (?, ?)
-                    ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                    """,
-                    ("openai_api_key", api_key),
-                )
-                flash("OpenAI API 키를 저장했습니다.")
-            return redirect(url_for("ai_settings"))
+            if action == "clear_gemini":
+                execute_db("DELETE FROM app_settings WHERE key = ?", ("gemini_api_key",))
+                flash("Gemini API 키를 삭제했습니다.")
+                return redirect(url_for("ai_settings"))
 
-        row = query_db("SELECT value FROM app_settings WHERE key = ?", ("openai_api_key",), one=True)
-        stored_key = (row["value"] if row else "").strip()
-        key_masked = f"{'*' * max(len(stored_key) - 4, 0)}{stored_key[-4:]}" if stored_key else ""
-        has_env_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
-        active_source = "웹앱 저장값" if stored_key else ("환경변수" if has_env_key else "없음")
+            if action == "save_gemini":
+                api_key = request.form.get("gemini_api_key", "").strip()
+                if not api_key:
+                    flash("Gemini API 키를 입력해주세요.")
+                else:
+                    set_app_setting("gemini_api_key", api_key)
+                    flash("Gemini API 키를 저장했습니다.")
+                return redirect(url_for("ai_settings"))
+
+        openai_stored_key = get_app_setting("openai_api_key", "").strip()
+        gemini_stored_key = get_app_setting("gemini_api_key", "").strip()
+        openai_key_masked = f"{'*' * max(len(openai_stored_key) - 4, 0)}{openai_stored_key[-4:]}" if openai_stored_key else ""
+        gemini_key_masked = f"{'*' * max(len(gemini_stored_key) - 4, 0)}{gemini_stored_key[-4:]}" if gemini_stored_key else ""
+
+        has_openai_env_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+        has_gemini_env_key = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+        provider = get_ai_provider()
+
         return render_template(
             "settings_ai.html",
-            has_stored_key=bool(stored_key),
-            key_masked=key_masked,
-            has_env_key=has_env_key,
-            active_source=active_source,
+            ai_provider=provider,
+            has_openai_stored_key=bool(openai_stored_key),
+            openai_key_masked=openai_key_masked,
+            has_openai_env_key=has_openai_env_key,
+            has_gemini_stored_key=bool(gemini_stored_key),
+            gemini_key_masked=gemini_key_masked,
+            has_gemini_env_key=has_gemini_env_key,
         )
 
     @app.route("/settings/ai/validate", methods=["POST"])
     def ai_settings_validate():
+        payload = request.get_json(silent=True) or {}
+        requested_provider = str(payload.get("provider", "")).strip().lower()
+        provider = requested_provider if requested_provider in {"openai", "gemini"} else get_ai_provider()
+
+        if provider == "gemini":
+            api_key = get_configured_gemini_api_key()
+            if not api_key:
+                return jsonify({"ok": False, "message": "활성화된 Gemini API 키가 없습니다."}), 200
+            try:
+                request_gemini_api_health(api_key)
+                return jsonify({"ok": True, "message": "정상: API 키로 Gemini 연결에 성공했습니다."}), 200
+            except RuntimeError as exc:
+                return jsonify({"ok": False, "message": str(exc)}), 200
+
         api_key = get_configured_openai_api_key()
         if not api_key:
-            return jsonify({"ok": False, "message": "활성화된 API 키가 없습니다."}), 200
+            return jsonify({"ok": False, "message": "활성화된 OpenAI API 키가 없습니다."}), 200
         try:
             request_openai_api_health(api_key)
             return jsonify({"ok": True, "message": "정상: API 키로 OpenAI 연결에 성공했습니다."}), 200
@@ -1881,6 +1933,18 @@ def is_security_configured() -> bool:
     return bool(get_app_setting("screen_lock_password_hash", "").strip())
 
 
+def get_ai_provider() -> str:
+    provider = get_app_setting("ai_provider", "openai").strip().lower()
+    return provider if provider in {"openai", "gemini"} else "openai"
+
+
+def get_configured_gemini_api_key() -> str:
+    row = query_db("SELECT value FROM app_settings WHERE key = ?", ("gemini_api_key",), one=True)
+    if row and row["value"].strip():
+        return row["value"].strip()
+    return os.environ.get("GEMINI_API_KEY", "").strip()
+
+
 def get_configured_openai_api_key() -> str:
     row = query_db("SELECT value FROM app_settings WHERE key = ?", ("openai_api_key",), one=True)
     if row and row["value"].strip():
@@ -1917,6 +1981,57 @@ def request_openai_case_conceptualization(api_key: str, system_prompt: str, user
         raise RuntimeError(f"OpenAI API 오류: {detail}") from exc
     except url_error.URLError as exc:
         raise RuntimeError("OpenAI API 연결에 실패했습니다. 네트워크를 확인하세요.") from exc
+
+
+def request_gemini_api_health(api_key: str) -> None:
+    req = url_request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}",
+        method="GET",
+    )
+    try:
+        with url_request.urlopen(req, timeout=20):
+            return
+    except url_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Gemini API 키 검증 실패: {detail}") from exc
+    except url_error.URLError as exc:
+        raise RuntimeError("Gemini API 연결 실패: 네트워크를 확인하세요.") from exc
+
+
+def request_gemini_case_conceptualization(api_key: str, system_prompt: str, user_prompt: str) -> str:
+    model = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+    body = {
+        "contents": [
+            {"role": "user", "parts": [{"text": system_prompt + "\n\n" + user_prompt}]}
+        ],
+        "generationConfig": {
+            "temperature": 0.4,
+        },
+    }
+    data = json.dumps(body).encode("utf-8")
+    req = url_request.Request(
+        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}",
+        data=data,
+        method="POST",
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with url_request.urlopen(req, timeout=30) as response:
+            raw = response.read().decode("utf-8")
+            parsed = json.loads(raw)
+            candidates = parsed.get("candidates") or []
+            if not candidates:
+                raise RuntimeError("Gemini 응답에 생성 결과가 없습니다.")
+            parts = (candidates[0].get("content") or {}).get("parts") or []
+            text = "".join(str(p.get("text", "")) for p in parts).strip()
+            if not text:
+                raise RuntimeError("Gemini 응답 텍스트를 파싱하지 못했습니다.")
+            return text
+    except url_error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Gemini API 오류: {detail}") from exc
+    except url_error.URLError as exc:
+        raise RuntimeError("Gemini API 연결에 실패했습니다. 네트워크를 확인하세요.") from exc
 
 
 def query_db(query: str, params: tuple[Any, ...] = (), one: bool = False):

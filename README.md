@@ -101,20 +101,27 @@ scripts\build_setup_windows.bat
 
 학생 상세 화면(`students/<id>`)에서 **사례개념화 초안 생성** 버튼을 사용할 수 있습니다.
 
-1. OpenAI API 키를 환경변수로 설정
-   - macOS/Linux
+1. OpenAI 또는 Gemini 키를 준비
+   - OpenAI (macOS/Linux)
    ```bash
    export OPENAI_API_KEY="여기에_키"
    export OPENAI_MODEL="gpt-4.1-mini"   # 선택(미설정 시 기본값 사용)
+   ```
+   - Gemini (macOS/Linux)
+   ```bash
+   export GEMINI_API_KEY="여기에_키"
+   export GEMINI_MODEL="gemini-1.5-flash"   # 선택(미설정 시 기본값 사용)
    ```
    - Windows(CMD)
    ```bat
    set OPENAI_API_KEY=여기에_키
    set OPENAI_MODEL=gpt-4.1-mini
+   set GEMINI_API_KEY=여기에_키
+   set GEMINI_MODEL=gemini-1.5-flash
    ```
 2. `scripts/run.sh` 또는 `scripts\run.bat`로 앱 실행
-3. 상단 메뉴의 `AI 설정`에서 API 키를 등록(또는 환경변수 사용)
-4. `AI 키 활성화 테스트` 버튼으로 키 활성화 여부 확인
+3. 상단 메뉴의 `AI 설정`에서 기본 제공자(OpenAI/Gemini)와 API 키를 등록(또는 환경변수 사용)
+4. `AI 키 활성화 테스트` 버튼으로 선택된 제공자의 키 활성화 여부 확인
 5. 학생 상세 페이지에서 사례개념화 초안 생성
 
 > 웹앱 저장 키는 로컬 SQLite(`app_settings`)에 저장됩니다. 공용 PC에서는 사용을 권장하지 않습니다.

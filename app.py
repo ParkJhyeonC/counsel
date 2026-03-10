@@ -1387,7 +1387,9 @@ def create_app() -> Flask:
 
         logs = query_db(
             """
-            SELECT id, date, type, summary
+            SELECT id, date, type, summary, detail, action_plan,
+                   main_category, sub_category, media_type,
+                   counsel_period, duration_minutes, next_date
             FROM counsel_logs
             WHERE student_id = ?
             ORDER BY date ASC, created_at ASC
@@ -1395,10 +1397,27 @@ def create_app() -> Flask:
             (student_id,),
         )
 
+        counseling_dates = [row["date"] for row in logs[:18]]
+        date_slots_first = counseling_dates[:9]
+        date_slots_second = counseling_dates[9:18]
+        while len(date_slots_first) < 9:
+            date_slots_first.append("")
+        while len(date_slots_second) < 9:
+            date_slots_second.append("")
+
+        counselor_name = get_app_setting("counselor_name", student["homeroom_teacher"] or "-")
+        school_name = get_app_setting("school_name", "정동고등학교")
+        end_date = logs[-1]["date"] if logs else ""
+
         return render_template(
             "student_record_form_print.html",
             student=student,
             logs=logs,
+            date_slots_first=date_slots_first,
+            date_slots_second=date_slots_second,
+            counselor_name=counselor_name,
+            school_name=school_name,
+            end_date=end_date,
             printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
 

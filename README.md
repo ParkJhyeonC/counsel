@@ -51,6 +51,19 @@ scripts\run.bat
 ---
 
 
+### Windows 게시자(Publisher) 표시 안내
+- `run.bat`를 직접 실행할 때 뜨는 **파일 열기 보안 경고**는 배치 파일 특성상 게시자 정보를 넣을 수 없습니다.
+- 게시자 이름(예: `전문상담교사 박재현`)을 보이게 하려면, 실행 파일(`.exe`/설치파일)에 **코드 서명(디지털 인증서)** 이 필요합니다.
+- 본 프로젝트는 설치 메타데이터 게시자를 `전문상담교사 박재현`으로 설정해 두었고, 아래 환경변수로 서명도 자동화할 수 있습니다.
+
+```bat
+set SIGN_PFX=C:\path\to\publisher_cert.pfx
+set SIGN_PFX_PASSWORD=인증서암호
+scripts\build_setup_windows.bat
+```
+
+> 서명 인증서가 없으면 Windows에는 계속 `알 수 없는 게시자`로 표시됩니다.
+
 ### Windows에서 VS Code 터미널 실행 팁
 - **프로젝트 루트 폴더**(`...\counselog`)에서 `scripts\run.bat` 를 실행하세요.
 - 경로 인식 오류가 나면 아래처럼 현재 위치를 먼저 확인하세요.

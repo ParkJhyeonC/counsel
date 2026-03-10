@@ -95,7 +95,7 @@ def create_app() -> Flask:
             FROM counsel_logs l
             JOIN students s ON s.id = l.student_id
             ORDER BY l.date DESC, l.created_at DESC
-            LIMIT 10
+            LIMIT 5
             """
         )
         upcoming_schedules = query_db(
@@ -781,6 +781,33 @@ def create_app() -> Flask:
             )
         grades, grade_class_map = get_grade_class_filters(student_rows)
         return render_template("students.html", students=student_rows, q=q, grades=grades, grade_class_map=grade_class_map)
+
+    @app.route("/logs")
+    def logs_list() -> str:
+        q = request.args.get("q", "").strip()
+        if q:
+            rows = query_db(
+                """
+                SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
+                       s.grade, s.class_no, s.class_name
+                FROM counsel_logs l
+                JOIN students s ON s.id = l.student_id
+                WHERE l.summary LIKE ? OR l.type LIKE ? OR s.name LIKE ? OR l.date LIKE ?
+                ORDER BY l.date DESC, l.created_at DESC
+                """,
+                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"),
+            )
+        else:
+            rows = query_db(
+                """
+                SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
+                       s.grade, s.class_no, s.class_name
+                FROM counsel_logs l
+                JOIN students s ON s.id = l.student_id
+                ORDER BY l.date DESC, l.created_at DESC
+                """
+            )
+        return render_template("logs.html", logs=rows, q=q)
 
     @app.route("/logs/new", methods=["GET", "POST"])
     def new_log() -> str:

@@ -942,7 +942,7 @@ def create_app() -> Flask:
                     return redirect(url_for("new_log", schedule_id=linked_schedule_id))
 
             if not student_id or not date or not log_type or not summary:
-                flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
+                flash("학생, 상담일, 상담유형, 상담제목은 필수입니다.")
             else:
                 log_id = execute_db(
                     """
@@ -1104,7 +1104,7 @@ def create_app() -> Flask:
                     return redirect(url_for("edit_log", log_id=log_id))
 
             if not student_id or not log_date or not log_type or not summary:
-                flash("학생, 상담일, 상담유형, 상담요약은 필수입니다.")
+                flash("학생, 상담일, 상담유형, 상담제목은 필수입니다.")
             else:
                 execute_db(
                     """

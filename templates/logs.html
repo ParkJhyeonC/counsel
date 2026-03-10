@@ -11,13 +11,13 @@
 
   <form method="get" class="search-form">
     <label>검색
-      <input name="q" value="{{ q }}" placeholder="학생명/유형/요약/날짜 검색">
+      <input name="q" value="{{ q }}" placeholder="학생명/유형/제목/날짜 검색">
     </label>
     <button class="btn" type="submit">조회</button>
   </form>
 
   <table>
-    <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th><th>상세</th><th>확인증</th></tr></thead>
+    <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>제목</th><th>상세</th><th>확인증</th></tr></thead>
     <tbody>
       {% for row in logs %}
       <tr>

@@ -52,7 +52,7 @@
         {% endfor %}
       </select>
     </label>
-    <label class="full">상담요약 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
+    <label class="full">상담제목 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
     <label class="full">상담내용 <textarea name="detail" rows="4">{{ prefill_schedule.note if prefill_schedule else '' }}</textarea></label>
     <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="3"></textarea></label>
     <label>대분류

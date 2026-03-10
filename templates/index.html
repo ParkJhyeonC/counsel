@@ -44,7 +44,7 @@
   <section class="card">
     <div class="page-intro"><h2>최근 상담일지</h2><a class="btn btn-secondary" href="{{ url_for('logs_list') }}">더보기</a></div>
     <table>
-      <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>요약</th></tr></thead>
+      <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>제목</th></tr></thead>
       <tbody>
         {% for row in latest_logs %}
         <tr>

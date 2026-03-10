@@ -9,6 +9,7 @@ from urllib import error as url_error
 from urllib import request as url_request
 import json
 from io import BytesIO
+from importlib import import_module, util as importlib_util
 from calendar import Calendar, monthrange
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -625,7 +626,7 @@ def create_app() -> Flask:
                 holiday_date = request.form.get("holiday_date", "").strip()
                 holiday_name = request.form.get("holiday_name", "").strip()
                 if not holiday_date:
-                    flash("공휴일 날짜를 입력해 주세요.")
+                    flash("임시공휴일 날짜를 입력해 주세요.")
                 else:
                     try:
                         date.fromisoformat(holiday_date)
@@ -637,22 +638,31 @@ def create_app() -> Flask:
                             """,
                             (holiday_date, holiday_name or "공휴일"),
                         )
-                        flash("공휴일을 저장했습니다.")
+                        flash("임시공휴일을 저장했습니다.")
                         return redirect(url_for("absence_tracker"))
                     except ValueError:
-                        flash("공휴일 날짜 형식이 올바르지 않습니다.")
+                        flash("임시공휴일 날짜 형식이 올바르지 않습니다.")
             elif action == "delete_holiday":
                 holiday_date = request.form.get("holiday_date", "").strip()
                 if holiday_date:
                     execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
-                    flash("공휴일을 삭제했습니다.")
+                    flash("임시공휴일을 삭제했습니다.")
                     return redirect(url_for("absence_tracker"))
 
         student_rows = query_db(
             "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"
         )
-        holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays ORDER BY holiday_date")
-        holidays = {row["holiday_date"] for row in holiday_rows}
+        temp_holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays ORDER BY holiday_date")
+
+        years = {datetime.now().year}
+        for r in query_db("SELECT start_date FROM unexcused_absences"):
+            try:
+                years.add(date.fromisoformat(r["start_date"]).year)
+            except ValueError:
+                continue
+        auto_holidays = get_korean_public_holidays(years)
+        temp_holidays = {row["holiday_date"]: (row["name"] or "임시공휴일") for row in temp_holiday_rows}
+        holidays = set(auto_holidays.keys()) | set(temp_holidays.keys())
 
         rows = query_db(
             """
@@ -685,7 +695,8 @@ def create_app() -> Flask:
             "absence_tracker.html",
             students=student_rows,
             tracked=tracked,
-            holiday_rows=holiday_rows,
+            temp_holiday_rows=temp_holiday_rows,
+            auto_holiday_count=len(auto_holidays),
             today=today.isoformat(),
         )
 
@@ -1306,6 +1317,34 @@ def add_column_if_missing(conn: sqlite3.Connection, table: str, column: str, col
     existing = {row[1] for row in rows}
     if column not in existing:
         conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+
+
+def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
+    years = {y for y in years if isinstance(y, int)}
+    if not years:
+        years = {datetime.now().year}
+
+    # `holidays` 패키지가 설치된 경우 한국 공휴일(대체공휴일 포함)을 사용
+    if importlib_util.find_spec("holidays") is not None:
+        holidays_mod = import_module("holidays")
+        kr = holidays_mod.KR(years=sorted(years))
+        return {d.isoformat(): str(name) for d, name in kr.items()}
+
+    # 패키지가 없을 때 최소한의 고정 공휴일 fallback
+    fixed = {}
+    for y in years:
+        for md, name in [
+            ("01-01", "신정"),
+            ("03-01", "삼일절"),
+            ("05-05", "어린이날"),
+            ("06-06", "현충일"),
+            ("08-15", "광복절"),
+            ("10-03", "개천절"),
+            ("10-09", "한글날"),
+            ("12-25", "성탄절"),
+        ]:
+            fixed[f"{y}-{md}"] = name
+    return fixed
 
 
 def business_days_count(start: date, end: date, holiday_dates: set[str]) -> int:

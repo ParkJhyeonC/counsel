@@ -124,6 +124,12 @@ def create_app() -> Flask:
         if db is not None:
             db.close()
 
+    @app.context_processor
+    def inject_global_branding() -> dict[str, str]:
+        school_name = get_app_setting("school_name", "고등학교")
+        app_title = f"{school_name} 상담일지 관리"
+        return {"school_name_global": school_name, "app_title": app_title}
+
     @app.route("/")
     def index() -> str:
         students = query_db(

@@ -495,6 +495,22 @@ def create_app() -> Flask:
         counselor_name = get_app_setting("counselor_name", "전문상담교사")
         return render_template("settings_school.html", school_name=school_name, counselor_name=counselor_name)
 
+    @app.route("/settings/schedule-slots", methods=["GET", "POST"])
+    def schedule_slots_settings() -> str:
+        if request.method == "POST":
+            raw_slots = request.form.get("schedule_slots", "")
+            slots = normalize_schedule_slots(raw_slots)
+            set_app_setting("schedule_slots", "\n".join(slots))
+            flash("시간/교시 설정을 저장했습니다.")
+            return redirect(url_for("schedule_slots_settings"))
+
+        configured_slots = get_schedule_slots()
+        return render_template(
+            "settings_schedule_slots.html",
+            schedule_slots_text="\n".join(configured_slots),
+            default_schedule_slots=DEFAULT_SCHEDULE_SLOTS,
+        )
+
     @app.route("/settings/counsel-types", methods=["GET", "POST"])
     def counsel_types_settings() -> str:
         if request.method == "POST":
@@ -570,6 +586,17 @@ def create_app() -> Flask:
             """
         )
 
+        type_stats = query_db(
+            """
+            SELECT type, COUNT(*) AS count
+            FROM counsel_logs
+            WHERE substr(date, 1, 4) = ?
+            GROUP BY type
+            ORDER BY count DESC, type ASC
+            """,
+            (selected_year,),
+        )
+
         total_count = query_db("SELECT COUNT(*) AS count FROM counsel_logs", one=True)["count"]
         selected_year_count = sum(row["count"] for row in monthly_stats)
 
@@ -580,6 +607,7 @@ def create_app() -> Flask:
             yearly_stats=yearly_stats,
             total_count=total_count,
             selected_year_count=selected_year_count,
+            type_stats=type_stats,
         )
 
     @app.route("/stats/neis-monthly-export")
@@ -718,7 +746,7 @@ def create_app() -> Flask:
 
         student_rows = query_db("SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name")
         grades, grade_class_map = get_grade_class_filters(student_rows)
-        counsel_types = get_counsel_types()
+        schedule_slots = get_schedule_slots()
         edit_schedule_id = request.values.get("edit_id", "").strip()
         edit_schedule = None
         if edit_schedule_id.isdigit():
@@ -877,6 +905,7 @@ def create_app() -> Flask:
             edit_schedule=edit_schedule,
             grades=grades,
             grade_class_map=grade_class_map,
+            schedule_slots=schedule_slots,
         )
 
     @app.route("/settings/vacations", methods=["GET", "POST"])
@@ -2092,6 +2121,32 @@ def request_openai_api_health(api_key: str) -> None:
         raise RuntimeError(f"OpenAI API 키 검증 실패: {detail}") from exc
     except url_error.URLError as exc:
         raise RuntimeError("OpenAI API 연결 실패: 네트워크를 확인하세요.") from exc
+
+
+
+DEFAULT_SCHEDULE_SLOTS = [
+    "1교시",
+    "2교시",
+    "3교시",
+    "4교시",
+    "5교시",
+    "6교시",
+    "7교시",
+]
+
+
+def normalize_schedule_slots(raw_text: str) -> list[str]:
+    slots: list[str] = []
+    for line in (raw_text or "").splitlines():
+        value = line.strip()
+        if value and value not in slots:
+            slots.append(value)
+    return slots or DEFAULT_SCHEDULE_SLOTS.copy()
+
+
+def get_schedule_slots() -> list[str]:
+    stored = get_app_setting("schedule_slots", "")
+    return normalize_schedule_slots(stored)
 
 
 def get_app_setting(key: str, default: str = "") -> str:

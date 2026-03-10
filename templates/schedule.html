@@ -70,17 +70,13 @@
       {% set selected_slot = edit_schedule.schedule_time if edit_schedule else '' %}
       <select name="schedule_slot">
         <option value="" {% if selected_slot == '' %}selected{% endif %}>미정</option>
-        <option value="1교시" {% if selected_slot == '1교시' %}selected{% endif %}>1교시</option>
-        <option value="2교시" {% if selected_slot == '2교시' %}selected{% endif %}>2교시</option>
-        <option value="3교시" {% if selected_slot == '3교시' %}selected{% endif %}>3교시</option>
-        <option value="4교시" {% if selected_slot == '4교시' %}selected{% endif %}>4교시</option>
-        <option value="5교시" {% if selected_slot == '5교시' %}selected{% endif %}>5교시</option>
-        <option value="6교시" {% if selected_slot == '6교시' %}selected{% endif %}>6교시</option>
-        <option value="7교시" {% if selected_slot == '7교시' %}selected{% endif %}>7교시</option>
-        <option value="직접입력" {% if selected_slot not in ['', '1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시'] %}selected{% endif %}>직접입력</option>
+        {% for slot in schedule_slots %}
+        <option value="{{ slot }}" {% if selected_slot == slot %}selected{% endif %}>{{ slot }}</option>
+        {% endfor %}
+        <option value="직접입력" {% if selected_slot and selected_slot not in schedule_slots %}selected{% endif %}>직접입력</option>
       </select>
     </label>
-    <label>직접입력 시간/교시 <input name="custom_slot" value="{% if edit_schedule and edit_schedule.schedule_time not in ['', '1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시'] %}{{ edit_schedule.schedule_time }}{% endif %}" placeholder="예: 점심시간, 방과후"></label>
+    <label>직접입력 시간/교시 <input name="custom_slot" value="{% if edit_schedule and edit_schedule.schedule_time and edit_schedule.schedule_time not in schedule_slots %}{{ edit_schedule.schedule_time }}{% endif %}" placeholder="예: 점심시간, 방과후"></label>
     <label class="full">일정 제목 <input name="title" value="{{ edit_schedule.title if edit_schedule else '' }}" required placeholder="예: 진로상담 2차"></label>
     <label class="full">메모 <textarea name="note" rows="3" placeholder="상담 준비사항">{{ edit_schedule.note if edit_schedule else '' }}</textarea></label>
     <button class="btn" type="submit">{% if edit_schedule %}일정 수정 저장{% else %}일정 등록{% endif %}</button>

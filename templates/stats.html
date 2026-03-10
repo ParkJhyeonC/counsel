@@ -43,6 +43,24 @@
 </section>
 
 <section class="card">
+  <h2>{{ selected_year }}년 상담유형별 통계</h2>
+  <table>
+    <thead><tr><th>상담유형</th><th>건수</th><th>비율</th></tr></thead>
+    <tbody>
+      {% for row in type_stats %}
+      <tr>
+        <td>{{ row.type or '미분류' }}</td>
+        <td>{{ row.count }}</td>
+        <td>{{ '%.1f'|format((row.count / selected_year_count * 100) if selected_year_count > 0 else 0) }}%</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">해당 연도 상담유형 데이터가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
   <h2>년간 상담 통계</h2>
   <table>
     <thead><tr><th>연도</th><th>상담 건수</th></tr></thead>

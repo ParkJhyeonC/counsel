@@ -304,6 +304,7 @@ tr:hover td { background: #fbfdff; }
 .warn-red { color: #b91c1c; }
 
 .day-cell.holiday { background: #fff7f7; border-color: #fecaca; }
+.day-cell.saturday { background: #eff6ff; border-color: #bfdbfe; }
 .holiday-chip {
   display:inline-block;
   margin-bottom:.2rem;
@@ -379,7 +380,7 @@ tr:hover td { background: #fbfdff; }
 .mini-day.outside { color: #94a3b8; background: #f8fafc; }
 .mini-day.today { outline: 1px solid #2563eb; font-weight: 700; }
 .mini-day.holiday { background: #fee2e2; color: #b91c1c; }
-.mini-day.saturday { color: #1d4ed8; }
+.mini-day.saturday { color: #1d4ed8; background: #eff6ff; }
 .mini-day.sunday { color: #b91c1c; }
 
 

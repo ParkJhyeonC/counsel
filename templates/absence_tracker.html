@@ -67,7 +67,7 @@
   <table>
     <thead>
       <tr>
-        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th><th>복귀처리</th>
+        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th><th>복귀처리</th><th>수정/삭제</th>
       </tr>
     </thead>
     <tbody>
@@ -115,9 +115,22 @@
           <span class="muted">-</span>
           {% endif %}
         </td>
+        <td>
+          <form method="post" class="inline-form" style="display:flex;gap:.35rem;align-items:center;flex-wrap:wrap;">
+            <input type="hidden" name="action" value="update_absence">
+            <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+            <input type="date" name="start_date" value="{{ item.row.start_date }}" required>
+            <button class="btn btn-secondary" type="submit">일자수정</button>
+          </form>
+          <form method="post" class="inline-form" onsubmit="return confirm('대상자를 삭제할까요?');" style="margin-top:.3rem;">
+            <input type="hidden" name="action" value="delete_absence">
+            <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+            <button class="btn btn-danger" type="submit">삭제</button>
+          </form>
+        </td>
       </tr>
       {% else %}
-      <tr><td colspan="6">등록된 대상이 없습니다.</td></tr>
+      <tr><td colspan="7">등록된 대상이 없습니다.</td></tr>
       {% endfor %}
     </tbody>
   </table>

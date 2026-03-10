@@ -707,6 +707,28 @@ def create_app() -> Flask:
                     )
                     flash("복귀 처리되었습니다.")
                     return redirect(url_for("absence_tracker"))
+            elif action == "update_absence":
+                absence_id = request.form.get("absence_id", "").strip()
+                start_date = request.form.get("start_date", "").strip()
+                if not absence_id.isdigit() or not start_date:
+                    flash("수정할 대상과 시작일을 확인해 주세요.")
+                else:
+                    try:
+                        date.fromisoformat(start_date)
+                        execute_db(
+                            "UPDATE unexcused_absences SET start_date = ? WHERE id = ?",
+                            (start_date, int(absence_id)),
+                        )
+                        flash("시작일을 수정했습니다.")
+                        return redirect(url_for("absence_tracker"))
+                    except ValueError:
+                        flash("시작일 형식이 올바르지 않습니다.")
+            elif action == "delete_absence":
+                absence_id = request.form.get("absence_id", "").strip()
+                if absence_id.isdigit():
+                    execute_db("DELETE FROM unexcused_absences WHERE id = ?", (int(absence_id),))
+                    flash("대상자를 삭제했습니다.")
+                    return redirect(url_for("absence_tracker"))
 
         student_rows = query_db(
             "SELECT id, student_no, name, grade, class_no, class_name FROM students ORDER BY grade, class_no, name"

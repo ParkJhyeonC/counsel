@@ -1,9 +1,10 @@
 @echo off
-setlocal EnableExtensions EnableDelayedExpansion
+setlocal
 
 set "SCRIPT_DIR=%~dp0"
-cd /d "%SCRIPT_DIR%.." || goto :error_root
+pushd "%SCRIPT_DIR%.." >nul 2>nul || goto :error_root
 set "ROOT_DIR=%CD%"
+popd >nul 2>nul
 set "RUN_BAT=%ROOT_DIR%\scripts\run.bat"
 
 echo [INFO] First-run helper (Windows)

@@ -1,4 +1,4 @@
-@echo off
+﻿@echo off
 setlocal EnableExtensions
 chcp 65001 >nul
 
@@ -16,18 +16,22 @@ if not exist "%ROOT_DIR%\static\style.css" goto :error_layout
 if not exist "%TRAY_PS1%" goto :error_layout
 
 where py >nul 2>nul
-if %errorlevel%==0 (
-  set "PY_CMD=py -3"
-) else (
-  where python >nul 2>nul
-  if %errorlevel%==0 (
-    set "PY_CMD=python"
-  ) else (
-    echo [ERROR] Python not found. Install Python 3.10+.
-    goto :error
-  )
-)
+if %errorlevel%==0 goto :use_py_launcher
+where python >nul 2>nul
+if %errorlevel%==0 goto :use_python
 
+echo [ERROR] Python not found. Install Python 3.10+.
+goto :error
+
+:use_py_launcher
+set "PY_CMD=py -3"
+goto :prepare
+
+:use_python
+set "PY_CMD=python"
+goto :prepare
+
+:prepare
 if not exist "%VENV_DIR%\Scripts\python.exe" (
   echo [INFO] Creating venv...
   %PY_CMD% -m venv "%VENV_DIR%" || goto :error

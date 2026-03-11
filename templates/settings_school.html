@@ -18,6 +18,14 @@
   <label class="full">CSV URL
     <input name="google_form_pull_csv_url" value="{{ pull_csv_url or '' }}" placeholder="https://docs.google.com/spreadsheets/d/.../gviz/tq?tqx=out:csv&sheet=폼응답1">
   </label>
+  <div class="full" style="margin-top:-.2rem;">
+    <p class="muted" style="margin:.15rem 0 .35rem;">권장 Google Form 문항(컬럼명) 예시</p>
+    <div class="muted" style="font-size:.92rem;line-height:1.5;background:#f8fafc;border:1px solid #dbe5f3;border-radius:10px;padding:.65rem .75rem;">
+      <div><strong>필수</strong>: 이름, 학년, 반, 상담희망일, 상담희망시간, 상담내용</div>
+      <div><strong>선택</strong>: 학번, 전화번호, 상담제목</div>
+      <div style="margin-top:.35rem;">CSV 헤더 예시: <code>타임스탬프,이름,학년,반,학번,전화번호,상담희망일,상담희망시간,상담제목,상담내용</code></div>
+    </div>
+  </div>
   <label>자동 동기화 사용
     <select name="google_form_pull_auto_sync_enabled">
       <option value="0" {% if not pull_auto_sync_enabled %}selected{% endif %}>사용 안 함</option>

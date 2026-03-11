@@ -130,6 +130,11 @@ scripts\build_setup_windows.bat
 
 > Inno Setup이 없는 경우에도 `dist\counselog` 폴더로 포터블 실행은 가능합니다.
 
+설치본(`Program Files\counselog`)에서 실행할 때 사용자 데이터(DB/첨부/백업)는 쓰기 권한이 있는 아래 경로를 사용합니다.
+- `%LOCALAPPDATA%\counselog\data`
+
+원하면 실행 전에 환경변수 `COUNSELOG_DATA_DIR`로 데이터 폴더를 직접 지정할 수 있습니다.
+
 ---
 
 ## AI 사례개념화 보조 사용법 (선택)

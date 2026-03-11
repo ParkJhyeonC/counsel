@@ -5,6 +5,7 @@ import re
 import sqlite3
 import uuid
 import zipfile
+import sys
 import csv
 import hashlib
 from urllib import error as url_error
@@ -40,9 +41,26 @@ ALLOWED_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "doc", "docx", "hwp", "txt"}
 PROJECT_ROOT = BASE_DIR
 TEMPLATE_DIR = PROJECT_ROOT / "templates"
 STATIC_DIR = PROJECT_ROOT / "static"
-DB_PATH = PROJECT_ROOT / "data" / "counsel.db"
-UPLOAD_DIR = PROJECT_ROOT / "data" / "uploads"
-BACKUP_DIR = PROJECT_ROOT / "data" / "backups"
+
+
+def get_runtime_data_dir() -> Path:
+    configured = os.environ.get("COUNSELOG_DATA_DIR", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+
+    if getattr(sys, "frozen", False):
+        local_app_data = os.environ.get("LOCALAPPDATA", "").strip()
+        if local_app_data:
+            return Path(local_app_data) / "counselog" / "data"
+        return Path.home() / "AppData" / "Local" / "counselog" / "data"
+
+    return PROJECT_ROOT / "data"
+
+
+DATA_DIR = get_runtime_data_dir()
+DB_PATH = DATA_DIR / "counsel.db"
+UPLOAD_DIR = DATA_DIR / "uploads"
+BACKUP_DIR = DATA_DIR / "backups"
 MAX_BACKUP_FILES = 20
 LOCK_TIMEOUT_SECONDS = 30 * 60
 CASE_CONCEPT_THEORIES: list[dict[str, str]] = [

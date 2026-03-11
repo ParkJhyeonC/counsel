@@ -135,6 +135,10 @@ scripts\build_setup_windows.bat
 
 원하면 실행 전에 환경변수 `COUNSELOG_DATA_DIR`로 데이터 폴더를 직접 지정할 수 있습니다.
 
+설치본 `counselog.exe` 실행 시에는 기본적으로 브라우저가 자동으로 `http://localhost:5000`을 엽니다.
+- 자동 열기를 끄려면: `COUNSELOG_OPEN_BROWSER=0`
+- 시작 URL을 바꾸려면: `COUNSELOG_START_URL=http://localhost:5000`
+
 ---
 
 ## AI 사례개념화 보조 사용법 (선택)

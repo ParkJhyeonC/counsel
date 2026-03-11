@@ -8,6 +8,8 @@ import zipfile
 import sys
 import csv
 import hashlib
+import threading
+import webbrowser
 from urllib import error as url_error
 from urllib import request as url_request
 import json
@@ -2846,4 +2848,12 @@ if __name__ == "__main__":
     auto_backup = ensure_daily_auto_backup()
     if auto_backup:
         print(f"[INFO] 자동 백업 생성: {auto_backup}")
-    app.run(host="0.0.0.0", port=5000, debug=True)
+
+    open_browser_enabled = os.environ.get("COUNSELOG_OPEN_BROWSER", "1").strip().lower() not in {"0", "false", "no"}
+    start_url = os.environ.get("COUNSELOG_START_URL", "http://localhost:5000").strip() or "http://localhost:5000"
+    if open_browser_enabled:
+        threading.Timer(1.2, lambda: webbrowser.open(start_url)).start()
+
+    is_frozen = bool(getattr(sys, "frozen", False))
+    debug_mode = os.environ.get("FLASK_DEBUG", "0" if is_frozen else "1").strip() == "1"
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode, use_reloader=(debug_mode and not is_frozen))

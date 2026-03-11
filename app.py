@@ -58,7 +58,6 @@ CASE_CONCEPT_THEORIES: list[dict[str, str]] = [
 
 def validate_project_layout() -> None:
     required_files = [
-        PROJECT_ROOT / "app.py",
         TEMPLATE_DIR / "index.html",
         TEMPLATE_DIR / "base.html",
         STATIC_DIR / "style.css",
@@ -66,7 +65,7 @@ def validate_project_layout() -> None:
     missing = [str(path) for path in required_files if not path.exists()]
     if missing:
         raise FileNotFoundError(
-            "프로젝트 폴더 구조를 찾을 수 없습니다. app.py와 templates/static 파일이 같은 프로젝트 루트에 있어야 합니다. "
+            "프로젝트 폴더 구조를 찾을 수 없습니다. templates/static 파일이 같은 프로젝트 루트에 있어야 합니다. "
             f"누락 파일: {missing}"
         )
 

@@ -5,6 +5,8 @@ import re
 import sqlite3
 import uuid
 import zipfile
+import csv
+import hashlib
 from urllib import error as url_error
 from urllib import request as url_request
 import json
@@ -282,102 +284,18 @@ def create_app() -> Flask:
             return jsonify({"ok": False, "error": "Invalid webhook token."}), 403
 
         payload = request.get_json(silent=True) or {}
-        ext_id = str(payload.get("response_id") or payload.get("submission_id") or payload.get("id") or "").strip()
-        if not ext_id:
-            ext_id = uuid.uuid4().hex
-
-        student_name = pick_first(payload, ["student_name", "name", "학생", "학생명"])
-        student_no = pick_first(payload, ["student_no", "학번"])
-        grade = pick_first(payload, ["grade", "학년"])
-        class_no = pick_first(payload, ["class_no", "반"])
-        phone = normalize_phone(pick_first(payload, ["phone", "연락처", "전화번호"]))
-        request_title = pick_first(payload, ["title", "subject", "상담제목", "신청제목"]) or "상담신청"
-        request_content = pick_first(payload, ["content", "message", "상담내용", "신청내용", "detail"])
-        requested_date = normalize_iso_date(pick_first(payload, ["requested_date", "date", "희망일", "상담희망일"]))
-        requested_time = pick_first(payload, ["requested_time", "time", "희망시간", "상담희망시간"])
-        submitted_at = normalize_iso_datetime(pick_first(payload, ["submitted_at", "timestamp", "created_at"])) or datetime.now().isoformat(timespec="seconds")
-
-        existing = query_db(
-            "SELECT id FROM incoming_counsel_requests WHERE external_response_id = ?",
-            (ext_id,),
-            one=True,
-        )
-
-        if existing is not None:
-            request_id = int(existing["id"])
-            execute_db(
-                """
-                UPDATE incoming_counsel_requests
-                SET student_name = ?, student_no = ?, grade = ?, class_no = ?, phone = ?,
-                    request_title = ?, request_content = ?, requested_date = ?, requested_time = ?,
-                    payload_json = ?, source_ip = ?, updated_at = ?, status = CASE WHEN status = 'scheduled' THEN status ELSE 'new' END
-                WHERE id = ?
-                """,
-                (
-                    student_name,
-                    student_no,
-                    grade,
-                    class_no,
-                    phone,
-                    request_title,
-                    request_content,
-                    requested_date,
-                    requested_time,
-                    json.dumps(payload, ensure_ascii=False),
-                    request.remote_addr or "",
-                    datetime.now().isoformat(timespec="seconds"),
-                    request_id,
-                ),
-            )
-        else:
-            request_id = execute_db(
-                """
-                INSERT INTO incoming_counsel_requests(
-                    external_response_id, source, student_name, student_no, grade, class_no, phone,
-                    request_title, request_content, requested_date, requested_time,
-                    payload_json, source_ip, status, submitted_at, created_at, updated_at
-                )
-                VALUES (?, 'google_form', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)
-                """,
-                (
-                    ext_id,
-                    student_name,
-                    student_no,
-                    grade,
-                    class_no,
-                    phone,
-                    request_title,
-                    request_content,
-                    requested_date,
-                    requested_time,
-                    json.dumps(payload, ensure_ascii=False),
-                    request.remote_addr or "",
-                    submitted_at,
-                    datetime.now().isoformat(timespec="seconds"),
-                    datetime.now().isoformat(timespec="seconds"),
-                ),
-            )
-
-        unread_existing = query_db(
-            """
-            SELECT id FROM notifications
-            WHERE related_request_id = ? AND type = 'incoming_counsel_request' AND is_read = 0
-            """,
-            (request_id,),
-            one=True,
-        )
-        if unread_existing is None:
-            message = f"상담신청이 도착했습니다: {(student_name or '신청자 미상')}"
-            link_url = url_for("schedule", request_id=request_id)
-            execute_db(
-                """
-                INSERT INTO notifications(type, message, link_url, related_request_id, is_read, created_at)
-                VALUES ('incoming_counsel_request', ?, ?, ?, 0, ?)
-                """,
-                (message, link_url, request_id, datetime.now().isoformat(timespec="seconds")),
-            )
+        request_id, _ = upsert_incoming_counsel_request(payload, source="google_form_webhook", source_ip=request.remote_addr or "")
 
         return jsonify({"ok": True, "request_id": request_id})
+
+    @app.route("/integrations/google-form/pull", methods=["POST"])
+    def google_form_pull() -> str:
+        result = pull_google_form_csv()
+        if not result["ok"]:
+            flash(f"Google Form Pull 실패: {result['error']}")
+        else:
+            flash(f"Google Form Pull 완료: {result['processed']}건 처리, 신규 {result['inserted']}건")
+        return redirect(url_for("school_settings"))
 
     @app.route("/students/<int:student_id>/ai/case-conceptualization", methods=["POST"])
     def ai_case_conceptualization(student_id: int):
@@ -663,6 +581,7 @@ def create_app() -> Flask:
             school_name = request.form.get("school_name", "").strip()
             counselor_name = request.form.get("counselor_name", "").strip()
             webhook_token = request.form.get("google_form_webhook_token", "").strip()
+            pull_csv_url = request.form.get("google_form_pull_csv_url", "").strip()
 
             execute_db(
                 """
@@ -688,17 +607,27 @@ def create_app() -> Flask:
                 """,
                 ("google_form_webhook_token", webhook_token),
             )
+            execute_db(
+                """
+                INSERT INTO app_settings(key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                ("google_form_pull_csv_url", pull_csv_url),
+            )
             flash("학교 설정을 저장했습니다.")
             return redirect(url_for("school_settings"))
 
         school_name = get_app_setting("school_name", "정동고등학교")
         counselor_name = get_app_setting("counselor_name", "전문상담교사")
         webhook_token = get_app_setting("google_form_webhook_token", "")
+        pull_csv_url = get_app_setting("google_form_pull_csv_url", "")
         return render_template(
             "settings_school.html",
             school_name=school_name,
             counselor_name=counselor_name,
             webhook_token=webhook_token,
+            pull_csv_url=pull_csv_url,
             webhook_url=url_for("google_form_webhook", _external=True),
         )
 
@@ -2465,6 +2394,155 @@ def get_webhook_token() -> str:
     if configured:
         return configured
     return os.environ.get("GOOGLE_FORM_WEBHOOK_TOKEN", "").strip()
+
+
+def build_external_response_id(payload: dict[str, Any]) -> str:
+    ext_id = str(payload.get("response_id") or payload.get("submission_id") or payload.get("id") or "").strip()
+    if ext_id:
+        return ext_id
+    seed_parts = [
+        pick_first(payload, ["submitted_at", "timestamp", "created_at", "타임스탬프"]),
+        pick_first(payload, ["student_name", "name", "학생", "학생명"]),
+        pick_first(payload, ["student_no", "학번"]),
+        pick_first(payload, ["phone", "연락처", "전화번호"]),
+        pick_first(payload, ["request_content", "content", "message", "상담내용", "신청내용"]),
+    ]
+    joined = "|".join((part or "").strip() for part in seed_parts)
+    if joined.strip("|"):
+        return hashlib.sha256(joined.encode("utf-8")).hexdigest()
+    return uuid.uuid4().hex
+
+
+def upsert_incoming_counsel_request(payload: dict[str, Any], source: str, source_ip: str = "") -> tuple[int, bool]:
+    ext_id = build_external_response_id(payload)
+    student_name = pick_first(payload, ["student_name", "name", "학생", "학생명"])
+    student_no = pick_first(payload, ["student_no", "학번"])
+    grade = pick_first(payload, ["grade", "학년"])
+    class_no = pick_first(payload, ["class_no", "반"])
+    phone = normalize_phone(pick_first(payload, ["phone", "연락처", "전화번호"]))
+    request_title = pick_first(payload, ["request_title", "title", "subject", "상담제목", "신청제목"]) or "상담신청"
+    request_content = pick_first(payload, ["request_content", "content", "message", "상담내용", "신청내용", "detail"])
+    requested_date = normalize_iso_date(pick_first(payload, ["requested_date", "date", "희망일", "상담희망일"]))
+    requested_time = pick_first(payload, ["requested_time", "time", "희망시간", "상담희망시간"])
+    submitted_at = normalize_iso_datetime(pick_first(payload, ["submitted_at", "timestamp", "created_at", "타임스탬프"])) or datetime.now().isoformat(timespec="seconds")
+
+    existing = query_db(
+        "SELECT id FROM incoming_counsel_requests WHERE external_response_id = ?",
+        (ext_id,),
+        one=True,
+    )
+
+    if existing is not None:
+        request_id = int(existing["id"])
+        created = False
+        execute_db(
+            """
+            UPDATE incoming_counsel_requests
+            SET student_name = ?, student_no = ?, grade = ?, class_no = ?, phone = ?,
+                request_title = ?, request_content = ?, requested_date = ?, requested_time = ?,
+                payload_json = ?, source_ip = ?, updated_at = ?, status = CASE WHEN status = 'scheduled' THEN status ELSE 'new' END
+            WHERE id = ?
+            """,
+            (
+                student_name,
+                student_no,
+                grade,
+                class_no,
+                phone,
+                request_title,
+                request_content,
+                requested_date,
+                requested_time,
+                json.dumps(payload, ensure_ascii=False),
+                source_ip,
+                datetime.now().isoformat(timespec="seconds"),
+                request_id,
+            ),
+        )
+    else:
+        created = True
+        request_id = execute_db(
+            """
+            INSERT INTO incoming_counsel_requests(
+                external_response_id, source, student_name, student_no, grade, class_no, phone,
+                request_title, request_content, requested_date, requested_time,
+                payload_json, source_ip, status, submitted_at, created_at, updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)
+            """,
+            (
+                ext_id,
+                source,
+                student_name,
+                student_no,
+                grade,
+                class_no,
+                phone,
+                request_title,
+                request_content,
+                requested_date,
+                requested_time,
+                json.dumps(payload, ensure_ascii=False),
+                source_ip,
+                submitted_at,
+                datetime.now().isoformat(timespec="seconds"),
+                datetime.now().isoformat(timespec="seconds"),
+            ),
+        )
+
+    unread_existing = query_db(
+        """
+        SELECT id FROM notifications
+        WHERE related_request_id = ? AND type = 'incoming_counsel_request' AND is_read = 0
+        """,
+        (request_id,),
+        one=True,
+    )
+    if unread_existing is None:
+        message = f"상담신청이 도착했습니다: {(student_name or '신청자 미상')}"
+        link_url = url_for("schedule", request_id=request_id)
+        execute_db(
+            """
+            INSERT INTO notifications(type, message, link_url, related_request_id, is_read, created_at)
+            VALUES ('incoming_counsel_request', ?, ?, ?, 0, ?)
+            """,
+            (message, link_url, request_id, datetime.now().isoformat(timespec="seconds")),
+        )
+
+    return request_id, created
+
+
+def pull_google_form_csv() -> dict[str, Any]:
+    csv_url = get_app_setting("google_form_pull_csv_url", "").strip()
+    if not csv_url:
+        return {"ok": False, "error": "CSV URL이 설정되지 않았습니다."}
+
+    if not csv_url.startswith(("http://", "https://")):
+        return {"ok": False, "error": "CSV URL은 http:// 또는 https:// 로 시작해야 합니다."}
+
+    try:
+        req = url_request.Request(csv_url, headers={"User-Agent": "counselog-google-form-pull"})
+        with url_request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8-sig", errors="replace")
+    except (url_error.URLError, TimeoutError) as exc:
+        return {"ok": False, "error": f"CSV 다운로드 실패: {exc}"}
+
+    rows = list(csv.DictReader(raw.splitlines()))
+    if not rows:
+        set_app_setting("google_form_pull_last_at", datetime.now().isoformat(timespec="seconds"))
+        return {"ok": True, "processed": 0, "inserted": 0}
+
+    processed = 0
+    inserted = 0
+    for row in rows:
+        payload = {k: (v or "").strip() for k, v in row.items() if k}
+        _, created = upsert_incoming_counsel_request(payload, source="google_form_pull", source_ip="google-sheets-csv")
+        processed += 1
+        if created:
+            inserted += 1
+
+    set_app_setting("google_form_pull_last_at", datetime.now().isoformat(timespec="seconds"))
+    return {"ok": True, "processed": processed, "inserted": inserted}
 
 
 def pick_first(payload: dict[str, Any], keys: list[str]) -> str:

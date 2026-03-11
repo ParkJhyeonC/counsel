@@ -50,6 +50,19 @@ scripts\run.bat
 
 ---
 
+## Google Form 연동 (Pull 방식)
+
+`localhost` 환경에서는 Google Apps Script Push(Webhook)가 직접 접근할 수 없으므로, Pull 방식으로 사용할 수 있습니다.
+
+1. Google Form 응답이 쌓이는 Google Sheets를 열고 `파일 > 공유 > 웹에 게시`에서 CSV 링크를 생성합니다.
+2. 앱 `설정 > 학교 설정`의 **Google Form 연동(Pull)** 영역에 CSV URL을 저장합니다.
+3. 같은 화면의 `지금 Pull 동기화 실행` 버튼을 누르면 최신 응답을 가져와 `상담신청 도착` 알림으로 생성합니다.
+4. 상단 `알림` 메뉴에서 항목을 열면 상담 일정 등록 화면으로 이동하고, 신청 내용이 자동 입력됩니다.
+
+> Pull은 수동 실행 방식입니다. 필요하면 주기적으로 버튼을 눌러 동기화하세요.
+
+---
+
 
 ### Windows 게시자(Publisher) 표시 안내
 - `run.bat`를 직접 실행할 때 뜨는 **파일 열기 보안 경고**는 배치 파일 특성상 게시자 정보를 넣을 수 없습니다.

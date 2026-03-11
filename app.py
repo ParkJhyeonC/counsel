@@ -2494,15 +2494,16 @@ def upsert_incoming_counsel_request(payload: dict[str, Any], source: str, source
             ),
         )
 
-    unread_existing = query_db(
+    existing_notification = query_db(
         """
         SELECT id FROM notifications
-        WHERE related_request_id = ? AND type = 'incoming_counsel_request' AND is_read = 0
+        WHERE related_request_id = ? AND type = 'incoming_counsel_request'
+        LIMIT 1
         """,
         (request_id,),
         one=True,
     )
-    if unread_existing is None:
+    if existing_notification is None:
         message = f"상담신청이 도착했습니다: {(student_name or '신청자 미상')}"
         link_url = url_for("schedule", request_id=request_id)
         execute_db(

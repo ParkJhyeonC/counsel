@@ -41,12 +41,19 @@ scripts\first_run_windows.bat
 scripts\run.bat
 ```
 
+Windows에서 트레이(시계 옆 아이콘)로 실행하고 싶다면 아래를 사용하세요.
+```bat
+scripts\run_tray.bat
+```
+
 위 스크립트가 자동으로 아래를 처리합니다.
 1. 가상환경 생성 (`.venv`)
 2. 의존성 설치
 3. DB 초기화 확인
 4. 서버 실행 (`http://localhost:5000`)
 5. (Windows `run.bat`) 기본 브라우저 자동 열기
+
+`run_tray.bat`은 콘솔창 대신 트레이 아이콘으로 실행되며, 아이콘 우클릭으로 브라우저 열기/종료를 선택할 수 있습니다.
 
 ---
 

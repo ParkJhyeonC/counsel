@@ -99,11 +99,10 @@ def create_app() -> Flask:
             "unlock_submit",
             "lock_now",
             "password_reset",
-            "google_form_webhook",
             "static",
         }
 
-        if not security_configured and endpoint not in {"security_setup", "google_form_webhook", "static"}:
+        if not security_configured and endpoint not in {"security_setup", "static"}:
             return redirect(url_for("security_setup"))
 
         if security_configured and endpoint not in exempt_endpoints:
@@ -121,6 +120,9 @@ def create_app() -> Flask:
                 return redirect(url_for("unlock_screen"))
 
             session["last_activity"] = now_ts
+
+        if security_configured and session.get("is_unlocked", False):
+            maybe_run_google_form_pull_auto()
 
     @app.teardown_request
     def teardown_request(exception: Exception | None) -> None:
@@ -267,26 +269,6 @@ def create_app() -> Flask:
         execute_db("UPDATE notifications SET is_read = 1 WHERE id = ?", (notification_id,))
         target = (row["link_url"] or "").strip() or url_for("notifications_page")
         return redirect(target)
-
-    @app.route("/integrations/google-form/webhook", methods=["POST"])
-    def google_form_webhook():
-        configured_token = get_webhook_token()
-        if not configured_token:
-            return jsonify({"ok": False, "error": "Webhook token not configured."}), 503
-
-        provided_token = (request.headers.get("X-Webhook-Token", "") or "").strip()
-        if not provided_token:
-            auth_header = (request.headers.get("Authorization", "") or "").strip()
-            if auth_header.lower().startswith("bearer "):
-                provided_token = auth_header[7:].strip()
-
-        if provided_token != configured_token:
-            return jsonify({"ok": False, "error": "Invalid webhook token."}), 403
-
-        payload = request.get_json(silent=True) or {}
-        request_id, _ = upsert_incoming_counsel_request(payload, source="google_form_webhook", source_ip=request.remote_addr or "")
-
-        return jsonify({"ok": True, "request_id": request_id})
 
     @app.route("/integrations/google-form/pull", methods=["POST"])
     def google_form_pull() -> str:
@@ -580,8 +562,12 @@ def create_app() -> Flask:
         if request.method == "POST":
             school_name = request.form.get("school_name", "").strip()
             counselor_name = request.form.get("counselor_name", "").strip()
-            webhook_token = request.form.get("google_form_webhook_token", "").strip()
             pull_csv_url = request.form.get("google_form_pull_csv_url", "").strip()
+            pull_auto_sync_enabled = "1" if request.form.get("google_form_pull_auto_sync_enabled") == "1" else "0"
+            pull_interval_text = request.form.get("google_form_pull_interval_minutes", "").strip()
+            if not pull_interval_text.isdigit():
+                pull_interval_text = "10"
+            pull_interval_minutes = str(max(1, min(1440, int(pull_interval_text))))
 
             execute_db(
                 """
@@ -605,30 +591,27 @@ def create_app() -> Flask:
                 VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
-                ("google_form_webhook_token", webhook_token),
-            )
-            execute_db(
-                """
-                INSERT INTO app_settings(key, value)
-                VALUES (?, ?)
-                ON CONFLICT(key) DO UPDATE SET value = excluded.value
-                """,
                 ("google_form_pull_csv_url", pull_csv_url),
             )
+            set_app_setting("google_form_pull_auto_sync_enabled", pull_auto_sync_enabled)
+            set_app_setting("google_form_pull_interval_minutes", pull_interval_minutes)
             flash("학교 설정을 저장했습니다.")
             return redirect(url_for("school_settings"))
 
         school_name = get_app_setting("school_name", "정동고등학교")
         counselor_name = get_app_setting("counselor_name", "전문상담교사")
-        webhook_token = get_app_setting("google_form_webhook_token", "")
         pull_csv_url = get_app_setting("google_form_pull_csv_url", "")
+        pull_auto_sync_enabled = get_app_setting("google_form_pull_auto_sync_enabled", "0") == "1"
+        pull_interval_minutes = get_app_setting("google_form_pull_interval_minutes", "10")
+        pull_last_at = get_app_setting("google_form_pull_last_at", "")
         return render_template(
             "settings_school.html",
             school_name=school_name,
             counselor_name=counselor_name,
-            webhook_token=webhook_token,
             pull_csv_url=pull_csv_url,
-            webhook_url=url_for("google_form_webhook", _external=True),
+            pull_auto_sync_enabled=pull_auto_sync_enabled,
+            pull_interval_minutes=pull_interval_minutes,
+            pull_last_at=pull_last_at,
         )
 
     @app.route("/settings/schedule-slots", methods=["GET", "POST"])
@@ -2389,11 +2372,32 @@ def get_lock_timeout_seconds() -> int:
     return minutes * 60
 
 
-def get_webhook_token() -> str:
-    configured = get_app_setting("google_form_webhook_token", "").strip()
-    if configured:
-        return configured
-    return os.environ.get("GOOGLE_FORM_WEBHOOK_TOKEN", "").strip()
+def get_pull_interval_minutes() -> int:
+    raw = get_app_setting("google_form_pull_interval_minutes", "10").strip()
+    if raw.isdigit():
+        return max(1, min(1440, int(raw)))
+    return 10
+
+
+def maybe_run_google_form_pull_auto() -> None:
+    if get_app_setting("google_form_pull_auto_sync_enabled", "0") != "1":
+        return
+    if not get_app_setting("google_form_pull_csv_url", "").strip():
+        return
+
+    now = datetime.now()
+    interval_minutes = get_pull_interval_minutes()
+    last_attempt_raw = get_app_setting("google_form_pull_last_auto_attempt_at", "").strip()
+    if last_attempt_raw:
+        try:
+            last_attempt = datetime.fromisoformat(last_attempt_raw)
+            if (now - last_attempt) < timedelta(minutes=interval_minutes):
+                return
+        except ValueError:
+            pass
+
+    set_app_setting("google_form_pull_last_auto_attempt_at", now.isoformat(timespec="seconds"))
+    pull_google_form_csv()
 
 
 def build_external_response_id(payload: dict[str, Any]) -> str:
@@ -2630,6 +2634,7 @@ def get_recent_notifications(limit: int = 5):
         """
         SELECT id, message, link_url, is_read, created_at
         FROM notifications
+        WHERE is_read = 0
         ORDER BY id DESC
         LIMIT ?
         """,

@@ -13,15 +13,21 @@
     </label>
     <button class="btn" type="submit">설정 저장</button>
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:.6rem 0;">
-  <h3 style="margin:.2rem 0 .35rem;">Google Form 연동(Push)</h3>
-  <p class="muted">Apps Script에서 아래 Webhook URL로 POST 보내고, 토큰을 헤더(X-Webhook-Token)로 전달하세요.</p>
-  <label class="full">Webhook URL <input value="{{ webhook_url }}" readonly></label>
-  <label class="full">Webhook 토큰 <input name="google_form_webhook_token" value="{{ webhook_token or '' }}" placeholder="임의의 긴 문자열 권장"></label>
   <h3 style="margin:.8rem 0 .35rem;">Google Form 연동(Pull)</h3>
-  <p class="muted">Google Sheets를 웹에 게시한 CSV URL을 저장하고, 아래 버튼으로 수동 동기화합니다.</p>
+  <p class="muted">Google Sheets를 웹에 게시한 CSV URL을 저장하면, 수동 또는 자동 간격으로 동기화할 수 있습니다.</p>
   <label class="full">CSV URL
     <input name="google_form_pull_csv_url" value="{{ pull_csv_url or '' }}" placeholder="https://docs.google.com/spreadsheets/d/.../gviz/tq?tqx=out:csv&sheet=폼응답1">
   </label>
+  <label>자동 동기화 사용
+    <select name="google_form_pull_auto_sync_enabled">
+      <option value="0" {% if not pull_auto_sync_enabled %}selected{% endif %}>사용 안 함</option>
+      <option value="1" {% if pull_auto_sync_enabled %}selected{% endif %}>사용</option>
+    </select>
+  </label>
+  <label>자동 동기화 간격(분)
+    <input type="number" name="google_form_pull_interval_minutes" min="1" max="1440" value="{{ pull_interval_minutes }}">
+  </label>
+  <p class="full muted">마지막 동기화 시각: {{ pull_last_at or '아직 없음' }}</p>
   <button class="btn" type="submit">저장</button>
 </form>
 <form method="post" action="{{ url_for('google_form_pull') }}" style="margin-top:.7rem;">

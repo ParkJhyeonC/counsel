@@ -40,7 +40,7 @@ if exist "%ROOT_DIR%\build" rmdir /s /q "%ROOT_DIR%\build"
 if exist "%ROOT_DIR%\dist" rmdir /s /q "%ROOT_DIR%\dist"
 if exist "%ROOT_DIR%\counselog.spec" del /q "%ROOT_DIR%\counselog.spec"
 
-"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --add-data "templates;templates" --add-data "static;static" app.py
+"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --hidden-import holidays --add-data "templates;templates" --add-data "static;static" app.py
 if errorlevel 1 goto :error
 
 

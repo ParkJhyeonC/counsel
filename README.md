@@ -128,6 +128,8 @@ scripts\build_setup_windows.bat
 - 실행 파일 폴더 빌드 (`dist\counselog`)
 - Inno Setup이 설치된 경우 설치 파일 생성 (`dist\counselog_setup.exe`)
 
+> 설치본에서도 한국 공휴일 자동 계산(대체공휴일 포함)이 유지되도록 `holidays` 모듈을 PyInstaller에 함께 포함합니다.
+
 앱 홈의 **자동 백업 관리**에서 아래 작업을 할 수 있습니다.
 - `지금 백업 생성`: 현재 DB/첨부파일을 ZIP으로 저장
 - `백업 복원`: 기존 백업 ZIP 업로드 후 데이터 복원 (복원 전 상태는 `pre_restore` 백업으로 자동 보관)

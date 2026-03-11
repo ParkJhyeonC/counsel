@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>정신건강 심리상담 바우처사업 의뢰서</title>
+  <style>
+    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; margin: 28px; color: #111; }
+    h1 { text-align: center; margin: 0 0 18px; font-size: 24px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    th, td { border: 1px solid #333; padding: 10px; vertical-align: top; font-size: 14px; }
+    th { background: #f5f5f5; width: 22%; text-align: center; }
+    .section-title { background: #efefef; font-weight: 700; }
+    .content-box { min-height: 130px; white-space: pre-wrap; }
+    .footer { margin-top: 30px; text-align: right; font-size: 14px; }
+    .print-meta { margin-top: 14px; font-size: 12px; color: #666; text-align: right; }
+    @media print { .no-print { display: none; } body { margin: 16px; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right;">
+    <button onclick="window.print()">인쇄</button>
+  </div>
+
+  <h1>정신건강 심리상담 바우처사업 의뢰서</h1>
+
+  <table>
+    <tr>
+      <th>학교명</th>
+      <td>{{ school_name }}</td>
+      <th>담당교사</th>
+      <td>{{ counselor_name or '-' }}</td>
+    </tr>
+    <tr>
+      <th>학생명</th>
+      <td>{{ student.name }}</td>
+      <th>학번</th>
+      <td>{{ student.student_no }}</td>
+    </tr>
+    <tr>
+      <th>학년/반</th>
+      <td>{{ student.grade or '-' }}학년 {{ student.class_no or student.class_name or '-' }}반</td>
+      <th>생년월일</th>
+      <td>{{ referral.birth_date or '-' }}</td>
+    </tr>
+    <tr>
+      <th>연락처</th>
+      <td>{{ student.phone or '-' }}</td>
+      <th>보호자 연락처</th>
+      <td>{{ student.guardian_phone or '-' }}</td>
+    </tr>
+    <tr>
+      <th>주소</th>
+      <td colspan="3">{{ referral.address or '-' }}</td>
+    </tr>
+    <tr>
+      <th class="section-title">학생 주호소내용</th>
+      <td colspan="3" class="content-box">{{ referral.chief_complaint or '' }}</td>
+    </tr>
+    <tr>
+      <th class="section-title">의뢰 사유</th>
+      <td colspan="3" class="content-box">{{ referral.referral_reason or '' }}</td>
+    </tr>
+  </table>
+
+  <div class="footer">
+    위 학생을 정신건강 심리상담 바우처사업 대상자로 의뢰합니다.
+  </div>
+  <div class="print-meta">출력일시: {{ printed_at }}</div>
+</body>
+</html>

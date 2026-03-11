@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>미인정결석 관리</h2>
+      <p class="muted">평일만 자동 카운트하며, 대한민국 공휴일(자동) + 임시공휴일(설정 탭에서 관리)을 제외합니다. 자동 반영 공휴일 수: {{ auto_holiday_count }}일</p>
+    </div>
+  </div>
+  <form method="post" class="grid-form" id="absence-form">
+    <input type="hidden" name="action" value="add_absence">
+
+    <label>학년
+      <select id="absence-grade-filter">
+        <option value="">전체</option>
+        {% for g in students | map(attribute='grade') | list | unique %}
+        {% if g %}<option value="{{ g }}">{{ g }}학년</option>{% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label>반
+      <select id="absence-class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+
+    <p class="form-hint full" id="absence-student-filter-hint"></p>
+    <label class="full">학생
+      <select name="student_id" id="absence-student-select" required>
+        <option value="">선택</option>
+        {% for s in students %}
+        <option value="{{ s.id }}" data-grade="{{ s.grade or '' }}" data-class="{{ s.class_no or '' }}">
+          {{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>시작일 <input type="date" name="start_date" value="{{ today }}" required></label>
+    <div class="button-row" style="align-self:end;">
+      <button class="btn" type="submit">등록</button>
+      <a class="btn btn-secondary" href="{{ url_for('holiday_settings') }}">임시공휴일 설정</a>
+    </div>
+  </form>
+</section>
+
+
+<section class="card">
+  <h2>대상자 현황</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th><th>복귀처리</th><th>수정/삭제</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in tracked %}
+      <tr>
+        <td>{{ item.row.grade or '-' }}학년 {{ item.row.class_no or item.row.class_name or '-' }}반 {{ item.row.student_name }}</td>
+        <td>{{ item.row.start_date }}</td>
+        <td>
+          <span class="absence-count" style="background: rgba(220, 38, 38, {{ 0.12 + item.danger_ratio * 0.55 }}); border-color: rgba(185, 28, 28, {{ 0.2 + item.danger_ratio * 0.6 }});">
+            {{ item.absence_days }}일
+          </span>
+        </td>
+        <td>
+          {% if item.is_active and item.is_home_visit_due %}
+            {% if item.row.home_visit_done %}
+              <span class="visit-done">완료</span>
+            {% else %}
+              <form method="post" action="{{ url_for('mark_home_visit', absence_id=item.row.id) }}" class="inline-form">
+                <button class="btn" type="submit">가정방문 처리</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <span class="muted">2일차 전</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.is_active %}
+            {% if item.is_report_due %}
+              <strong class="warn-red">교육청 보고 필요</strong>
+            {% else %}
+              <span class="muted">{{ 7 - item.absence_days }}일 남음</span>
+            {% endif %}
+          {% else %}
+            <span class="visit-done">복귀완료 ({{ item.row.return_date or '-' }})</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.is_active %}
+          <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="mark_return">
+            <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+            <button class="btn btn-secondary" type="submit">복귀처리</button>
+          </form>
+          {% else %}
+          <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:nowrap;">
+            <form method="post" class="inline-form">
+              <input type="hidden" name="action" value="update_absence">
+              <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+              <input type="date" name="start_date" value="{{ item.row.start_date }}" required>
+              <button class="btn btn-secondary" type="submit">일자수정</button>
+            </form>
+            <form method="post" class="inline-form" onsubmit="return confirm('대상자를 삭제할까요?');">
+              <input type="hidden" name="action" value="delete_absence">
+              <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+              <button class="btn btn-danger" type="submit">삭제</button>
+            </form>
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7">등록된 대상이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script>
+  const gradeFilter = document.getElementById('absence-grade-filter');
+  const classFilter = document.getElementById('absence-class-filter');
+  const studentSelect = document.getElementById('absence-student-select');
+  const hintEl = document.getElementById('absence-student-filter-hint');
+
+  function getGradeClassMap() {
+    const map = {};
+    [...studentSelect.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const g = opt.dataset.grade || '';
+      const c = opt.dataset.class || '';
+      if (!g || !c) return;
+      if (!map[g]) map[g] = new Set();
+      map[g].add(c);
+    });
+    return map;
+  }
+  const gradeClassMap = getGradeClassMap();
+
+  function fillClassOptions() {
+    const grade = gradeFilter.value;
+    const classes = grade ? [...(gradeClassMap[grade] || [])].sort((a,b)=>(+a||a)-(+b||b)) : [];
+    const prev = classFilter.value;
+    classFilter.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      classFilter.appendChild(opt);
+    });
+    if (classes.includes(prev)) classFilter.value = prev;
+  }
+
+  function filterStudents() {
+    const grade = gradeFilter.value;
+    const klass = classFilter.value;
+    let visibleCount = 0;
+    [...studentSelect.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
+    });
+    if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+    hintEl.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
+  }
+
+  gradeFilter.addEventListener('change', () => { fillClassOptions(); filterStudents(); });
+  classFilter.addEventListener('change', filterStudents);
+  fillClassOptions();
+  filterStudents();
+</script>
+{% endblock %}

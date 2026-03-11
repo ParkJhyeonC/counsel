@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>방학기간 설정</h2>
+  <p class="muted">설정한 기간은 달력에서 공휴일처럼 빨간색으로 표시되며, 상단에 방학 D-day가 노출됩니다.</p>
+
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="add_vacation">
+    <label>시작일 <input type="date" name="start_date" required></label>
+    <label>종료일 <input type="date" name="end_date" required></label>
+    <label class="full">이름 <input name="name" placeholder="예: 여름방학"></label>
+    <button class="btn" type="submit">저장</button>
+  </form>
+
+  <table>
+    <thead><tr><th>시작일</th><th>종료일</th><th>이름</th><th>삭제</th></tr></thead>
+    <tbody>
+      {% for row in vacation_rows %}
+      <tr>
+        <td>{{ row.start_date }}</td><td>{{ row.end_date }}</td><td>{{ row.name or '방학' }}</td>
+        <td>
+          <form method="post" class="inline-form">
+            <input type="hidden" name="action" value="delete_vacation">
+            <input type="hidden" name="vacation_id" value="{{ row.id }}">
+            <button class="btn btn-secondary" type="submit">삭제</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">등록된 방학기간이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

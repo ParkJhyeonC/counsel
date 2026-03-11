@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="kpi-grid">
+  <article class="card kpi-card">
+    <p class="kpi-label">등록 학생</p>
+    <p class="kpi-value">{{ students_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">전체 상담일지</p>
+    <p class="kpi-value">{{ logs_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">예정 상담일정</p>
+    <p class="kpi-value">{{ upcoming_count }}</p>
+  </article>
+  <article class="card kpi-card mini-calendar-card">
+    <p class="kpi-label"><a class="mini-calendar-title" href="{{ url_for('schedule', month=mini_month_key, date=mini_today_iso) }}">{{ mini_month_title }}</a></p>
+    <div class="mini-cal-grid">
+      <div class="mini-head sunday">일</div><div class="mini-head">월</div><div class="mini-head">화</div><div class="mini-head">수</div><div class="mini-head">목</div><div class="mini-head">금</div><div class="mini-head saturday">토</div>
+      {% for week in mini_calendar_weeks %}
+        {% for d in week %}
+        <a class="mini-day {% if not d.is_current_month %}outside{% endif %} {% if d.is_today %}today{% endif %} {% if d.is_holiday %}holiday{% endif %} {% if d.is_saturday %}saturday{% endif %} {% if d.is_sunday %}sunday{% endif %}" href="{{ url_for('schedule', month=d.date[:7], date=d.date) }}">{{ d.day }}</a>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </article>
+</section>
+
+
+
+<section class="dashboard-grid">
+  <section class="card">
+    <h2>예정된 상담 일정</h2>
+    <table>
+      <thead><tr><th>날짜</th><th>시간</th><th>학생</th><th>제목</th></tr></thead>
+      <tbody>
+        {% for row in upcoming_schedules %}
+        <tr>
+          <td>{{ row.schedule_date }}</td>
+          <td>{{ row.schedule_time or '-' }}</td>
+          <td>{{ row.student_name or '미지정' }}</td>
+          <td>{{ row.title }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">예정된 상담 일정이 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card">
+    <div class="page-intro"><h2>최근 상담일지</h2><a class="btn btn-secondary" href="{{ url_for('logs_list') }}">더보기</a></div>
+    <table>
+      <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>제목</th></tr></thead>
+      <tbody>
+        {% for row in latest_logs %}
+        <tr>
+          <td>{{ row.date }}</td>
+          <td>{{ row.student_name }}</td>
+          <td>{{ row.type }}</td>
+          <td>{{ row.summary }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4">아직 상담일지가 없습니다.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</section>
+
+
+<section class="card">
+  <div class="page-intro">
+    <h2>미인정결석 현황</h2>
+    <a class="btn btn-secondary" href="{{ url_for('absence_tracker') }}">관리 화면으로 이동</a>
+  </div>
+  <p class="muted">현재 진행중 대상자와 가정방문 미완료 인원을 빠르게 확인할 수 있습니다.</p>
+  <div class="button-row">
+    <span class="absence-count">진행중 대상 {{ active_absence_count }}명</span>
+    <span class="absence-count">가정방문 미완료 {{ home_visit_pending_count }}명</span>
+  </div>
+</section>
+
+<section class="card">
+  <h2>자동 백업 관리</h2>
+  <p class="muted">앱 실행 시 하루 1회 자동 백업이 생성되며, 아래 버튼으로 수동 백업도 생성할 수 있습니다.</p>
+  <form method="post" action="{{ url_for('create_backup') }}">
+    <button class="btn" type="submit">지금 백업 생성</button>
+  </form>
+  <form method="post" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data" style="margin-top:.6rem;">
+    <label class="full">백업 불러오기 (ZIP)
+      <input type="file" name="backup_file" accept=".zip" required>
+    </label>
+    <button class="btn btn-secondary" type="submit" onclick="return confirm('현재 데이터가 백업 파일 내용으로 교체됩니다. 계속할까요?');">백업 복원</button>
+  </form>
+  <table>
+    <thead><tr><th>파일명</th><th>다운로드</th></tr></thead>
+    <tbody>
+      {% for backup in backup_files %}
+      <tr>
+        <td>{{ backup.name }}</td>
+        <td><a href="{{ url_for('download_backup', filename=backup.name) }}">다운로드</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="2">생성된 백업 파일이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<p class="provider-credit">전문상담교사 박재현 제공</p>
+{% endblock %}

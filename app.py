@@ -2071,9 +2071,13 @@ def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
 
     # `holidays` 패키지가 설치된 경우 한국 공휴일(대체공휴일 포함)을 사용
     if importlib_util.find_spec("holidays") is not None:
-        holidays_mod = import_module("holidays")
-        kr = holidays_mod.KR(years=sorted(years))
-        return {d.isoformat(): str(name) for d, name in kr.items()}
+        try:
+            holidays_mod = import_module("holidays")
+            kr = holidays_mod.KR(years=sorted(years))
+            return {d.isoformat(): str(name) for d, name in kr.items()}
+        except Exception:
+            # 패키징 환경에서 holidays 내부 의존성이 누락되더라도 앱은 fallback으로 동작
+            pass
 
     # 패키지가 없을 때 최소한의 고정 공휴일 fallback
     fixed = {}

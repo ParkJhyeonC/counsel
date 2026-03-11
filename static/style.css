@@ -399,3 +399,49 @@ tr:hover td { background: #fbfdff; }
   color: #94a3b8;
   font-size: .82rem;
 }
+
+
+.notif-badge {
+  display: inline-block;
+  min-width: 18px;
+  padding: 0 .35rem;
+  margin-left: .28rem;
+  background: #dc2626;
+  color: #fff;
+  border-radius: 999px;
+  font-size: .72rem;
+  font-weight: 700;
+  text-align: center;
+}
+.quick-notifications {
+  border-bottom: 1px solid #dbe4f1;
+  background: rgba(255,255,255,.85);
+}
+.quick-notifications-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: .35rem 1rem;
+  display: flex;
+  gap: .45rem;
+  flex-wrap: wrap;
+}
+.quick-notification-item {
+  text-decoration: none;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: .2rem .55rem;
+  font-size: .82rem;
+}
+.quick-notification-item.unread {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.quick-notification-more {
+  text-decoration: none;
+  color: #2563eb;
+  font-size: .82rem;
+  padding: .2rem .25rem;
+}

@@ -97,10 +97,11 @@ def create_app() -> Flask:
             "unlock_submit",
             "lock_now",
             "password_reset",
+            "google_form_webhook",
             "static",
         }
 
-        if not security_configured and endpoint not in {"security_setup", "static"}:
+        if not security_configured and endpoint not in {"security_setup", "google_form_webhook", "static"}:
             return redirect(url_for("security_setup"))
 
         if security_configured and endpoint not in exempt_endpoints:
@@ -130,11 +131,19 @@ def create_app() -> Flask:
         school_name = get_app_setting("school_name", "정동고등학교")
         app_title = f"{school_name} 카운슬로그"
         vacation_dday_text = get_vacation_dday_text(datetime.now().date())
+        unread_notification_count = 0
+        recent_notifications: list[sqlite3.Row] = []
+        if is_security_configured() and session.get("is_unlocked", False):
+            unread_notification_count = get_unread_notification_count()
+            recent_notifications = get_recent_notifications(5)
+
         return {
             "school_name_global": school_name,
             "app_title": app_title,
             "vacation_dday_text": vacation_dday_text,
             "lock_timeout_minutes": get_lock_timeout_seconds() // 60,
+            "unread_notification_count": unread_notification_count,
+            "recent_notifications": recent_notifications,
         }
 
     @app.route("/")
@@ -229,6 +238,146 @@ def create_app() -> Flask:
     @app.route("/backup/download/<path:filename>")
     def download_backup(filename: str):
         return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+    @app.route("/notifications")
+    def notifications_page() -> str:
+        rows = query_db(
+            """
+            SELECT id, type, message, link_url, is_read, related_request_id, created_at
+            FROM notifications
+            ORDER BY id DESC
+            LIMIT 100
+            """
+        )
+        return render_template("notifications.html", notifications=rows)
+
+    @app.route("/notifications/<int:notification_id>/open")
+    def open_notification(notification_id: int):
+        row = query_db(
+            "SELECT id, link_url FROM notifications WHERE id = ?",
+            (notification_id,),
+            one=True,
+        )
+        if row is None:
+            flash("알림을 찾을 수 없습니다.")
+            return redirect(url_for("notifications_page"))
+
+        execute_db("UPDATE notifications SET is_read = 1 WHERE id = ?", (notification_id,))
+        target = (row["link_url"] or "").strip() or url_for("notifications_page")
+        return redirect(target)
+
+    @app.route("/integrations/google-form/webhook", methods=["POST"])
+    def google_form_webhook():
+        configured_token = get_webhook_token()
+        if not configured_token:
+            return jsonify({"ok": False, "error": "Webhook token not configured."}), 503
+
+        provided_token = (request.headers.get("X-Webhook-Token", "") or "").strip()
+        if not provided_token:
+            auth_header = (request.headers.get("Authorization", "") or "").strip()
+            if auth_header.lower().startswith("bearer "):
+                provided_token = auth_header[7:].strip()
+
+        if provided_token != configured_token:
+            return jsonify({"ok": False, "error": "Invalid webhook token."}), 403
+
+        payload = request.get_json(silent=True) or {}
+        ext_id = str(payload.get("response_id") or payload.get("submission_id") or payload.get("id") or "").strip()
+        if not ext_id:
+            ext_id = uuid.uuid4().hex
+
+        student_name = pick_first(payload, ["student_name", "name", "학생", "학생명"])
+        student_no = pick_first(payload, ["student_no", "학번"])
+        grade = pick_first(payload, ["grade", "학년"])
+        class_no = pick_first(payload, ["class_no", "반"])
+        phone = normalize_phone(pick_first(payload, ["phone", "연락처", "전화번호"]))
+        request_title = pick_first(payload, ["title", "subject", "상담제목", "신청제목"]) or "상담신청"
+        request_content = pick_first(payload, ["content", "message", "상담내용", "신청내용", "detail"])
+        requested_date = normalize_iso_date(pick_first(payload, ["requested_date", "date", "희망일", "상담희망일"]))
+        requested_time = pick_first(payload, ["requested_time", "time", "희망시간", "상담희망시간"])
+        submitted_at = normalize_iso_datetime(pick_first(payload, ["submitted_at", "timestamp", "created_at"])) or datetime.now().isoformat(timespec="seconds")
+
+        existing = query_db(
+            "SELECT id FROM incoming_counsel_requests WHERE external_response_id = ?",
+            (ext_id,),
+            one=True,
+        )
+
+        if existing is not None:
+            request_id = int(existing["id"])
+            execute_db(
+                """
+                UPDATE incoming_counsel_requests
+                SET student_name = ?, student_no = ?, grade = ?, class_no = ?, phone = ?,
+                    request_title = ?, request_content = ?, requested_date = ?, requested_time = ?,
+                    payload_json = ?, source_ip = ?, updated_at = ?, status = CASE WHEN status = 'scheduled' THEN status ELSE 'new' END
+                WHERE id = ?
+                """,
+                (
+                    student_name,
+                    student_no,
+                    grade,
+                    class_no,
+                    phone,
+                    request_title,
+                    request_content,
+                    requested_date,
+                    requested_time,
+                    json.dumps(payload, ensure_ascii=False),
+                    request.remote_addr or "",
+                    datetime.now().isoformat(timespec="seconds"),
+                    request_id,
+                ),
+            )
+        else:
+            request_id = execute_db(
+                """
+                INSERT INTO incoming_counsel_requests(
+                    external_response_id, source, student_name, student_no, grade, class_no, phone,
+                    request_title, request_content, requested_date, requested_time,
+                    payload_json, source_ip, status, submitted_at, created_at, updated_at
+                )
+                VALUES (?, 'google_form', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)
+                """,
+                (
+                    ext_id,
+                    student_name,
+                    student_no,
+                    grade,
+                    class_no,
+                    phone,
+                    request_title,
+                    request_content,
+                    requested_date,
+                    requested_time,
+                    json.dumps(payload, ensure_ascii=False),
+                    request.remote_addr or "",
+                    submitted_at,
+                    datetime.now().isoformat(timespec="seconds"),
+                    datetime.now().isoformat(timespec="seconds"),
+                ),
+            )
+
+        unread_existing = query_db(
+            """
+            SELECT id FROM notifications
+            WHERE related_request_id = ? AND type = 'incoming_counsel_request' AND is_read = 0
+            """,
+            (request_id,),
+            one=True,
+        )
+        if unread_existing is None:
+            message = f"상담신청이 도착했습니다: {(student_name or '신청자 미상')}"
+            link_url = url_for("schedule", request_id=request_id)
+            execute_db(
+                """
+                INSERT INTO notifications(type, message, link_url, related_request_id, is_read, created_at)
+                VALUES ('incoming_counsel_request', ?, ?, ?, 0, ?)
+                """,
+                (message, link_url, request_id, datetime.now().isoformat(timespec="seconds")),
+            )
+
+        return jsonify({"ok": True, "request_id": request_id})
 
     @app.route("/students/<int:student_id>/ai/case-conceptualization", methods=["POST"])
     def ai_case_conceptualization(student_id: int):
@@ -513,6 +662,7 @@ def create_app() -> Flask:
         if request.method == "POST":
             school_name = request.form.get("school_name", "").strip()
             counselor_name = request.form.get("counselor_name", "").strip()
+            webhook_token = request.form.get("google_form_webhook_token", "").strip()
 
             execute_db(
                 """
@@ -530,12 +680,27 @@ def create_app() -> Flask:
                 """,
                 ("counselor_name", counselor_name),
             )
+            execute_db(
+                """
+                INSERT INTO app_settings(key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                ("google_form_webhook_token", webhook_token),
+            )
             flash("학교 설정을 저장했습니다.")
             return redirect(url_for("school_settings"))
 
         school_name = get_app_setting("school_name", "정동고등학교")
         counselor_name = get_app_setting("counselor_name", "전문상담교사")
-        return render_template("settings_school.html", school_name=school_name, counselor_name=counselor_name)
+        webhook_token = get_app_setting("google_form_webhook_token", "")
+        return render_template(
+            "settings_school.html",
+            school_name=school_name,
+            counselor_name=counselor_name,
+            webhook_token=webhook_token,
+            webhook_url=url_for("google_form_webhook", _external=True),
+        )
 
     @app.route("/settings/schedule-slots", methods=["GET", "POST"])
     def schedule_slots_settings() -> str:
@@ -790,6 +955,42 @@ def create_app() -> Flask:
         grades, grade_class_map = get_grade_class_filters(student_rows)
         schedule_slots = get_schedule_slots()
         edit_schedule_id = request.values.get("edit_id", "").strip()
+        request_id_param = request.values.get("request_id", "").strip()
+        prefill_request = None
+        if request_id_param.isdigit():
+            prefill_request = query_db(
+                """
+                SELECT id, student_name, student_no, grade, class_no, phone,
+                       request_title, request_content, requested_date, requested_time,
+                       status, linked_schedule_id
+                FROM incoming_counsel_requests
+                WHERE id = ?
+                """,
+                (int(request_id_param),),
+                one=True,
+            )
+
+        prefill_student_id = ""
+        prefill_title = ""
+        prefill_note = ""
+        prefill_date = selected_date
+        prefill_slot = ""
+        prefill_custom_slot = ""
+
+        if prefill_request:
+            matched_student = find_student_for_incoming_request(prefill_request)
+            if matched_student is not None:
+                prefill_student_id = str(matched_student["id"])
+            prefill_title = (prefill_request["request_title"] or "").strip()
+            prefill_note = (prefill_request["request_content"] or "").strip()
+            prefill_date = (prefill_request["requested_date"] or "").strip() or selected_date
+            req_time = (prefill_request["requested_time"] or "").strip()
+            if req_time in schedule_slots:
+                prefill_slot = req_time
+            elif req_time:
+                prefill_slot = "직접입력"
+                prefill_custom_slot = req_time
+
         edit_schedule = None
         if edit_schedule_id.isdigit():
             edit_schedule = query_db(
@@ -809,6 +1010,7 @@ def create_app() -> Flask:
             custom_slot = request.form.get("custom_slot", "").strip()
             title = request.form.get("title", "").strip()
             note = request.form.get("note", "").strip()
+            request_id_raw = request.form.get("request_id", "").strip()
 
             schedule_time = schedule_slot
             if schedule_slot == "직접입력":
@@ -837,7 +1039,7 @@ def create_app() -> Flask:
                     )
                     flash("상담 일정이 수정되었습니다.")
                 else:
-                    execute_db(
+                    new_schedule_id = execute_db(
                         """
                         INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
                         VALUES (?, ?, ?, ?, ?, 'planned', ?)
@@ -851,6 +1053,24 @@ def create_app() -> Flask:
                             datetime.now().isoformat(timespec="seconds"),
                         ),
                     )
+                    if request_id_raw.isdigit():
+                        execute_db(
+                            """
+                            UPDATE incoming_counsel_requests
+                            SET status = 'scheduled', linked_schedule_id = ?, processed_at = ?, updated_at = ?
+                            WHERE id = ?
+                            """,
+                            (
+                                int(new_schedule_id),
+                                datetime.now().isoformat(timespec="seconds"),
+                                datetime.now().isoformat(timespec="seconds"),
+                                int(request_id_raw),
+                            ),
+                        )
+                        execute_db(
+                            "UPDATE notifications SET is_read = 1 WHERE related_request_id = ?",
+                            (int(request_id_raw),),
+                        )
                     flash("상담 일정이 등록되었습니다.")
                 return redirect(url_for("schedule", date=schedule_date, month=schedule_date[:7]))
 
@@ -948,6 +1168,13 @@ def create_app() -> Flask:
             grades=grades,
             grade_class_map=grade_class_map,
             schedule_slots=schedule_slots,
+            prefill_request=prefill_request,
+            prefill_student_id=prefill_student_id,
+            prefill_title=prefill_title,
+            prefill_note=prefill_note,
+            prefill_date=prefill_date,
+            prefill_slot=prefill_slot,
+            prefill_custom_slot=prefill_custom_slot,
         )
 
     @app.route("/settings/vacations", methods=["GET", "POST"])
@@ -1817,6 +2044,39 @@ def init_db() -> None:
                 name TEXT
             );
 
+            CREATE TABLE IF NOT EXISTS incoming_counsel_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                external_response_id TEXT UNIQUE,
+                source TEXT NOT NULL DEFAULT 'google_form',
+                student_name TEXT,
+                student_no TEXT,
+                grade TEXT,
+                class_no TEXT,
+                phone TEXT,
+                request_title TEXT,
+                request_content TEXT,
+                requested_date TEXT,
+                requested_time TEXT,
+                payload_json TEXT,
+                source_ip TEXT,
+                status TEXT NOT NULL DEFAULT 'new',
+                linked_schedule_id INTEGER,
+                submitted_at TEXT,
+                processed_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS notifications (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type TEXT NOT NULL,
+                message TEXT NOT NULL,
+                link_url TEXT,
+                related_request_id INTEGER,
+                is_read INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            );
+
             CREATE TABLE IF NOT EXISTS counsel_types (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
@@ -2198,6 +2458,96 @@ def get_lock_timeout_seconds() -> int:
     else:
         minutes = 30
     return minutes * 60
+
+
+def get_webhook_token() -> str:
+    configured = get_app_setting("google_form_webhook_token", "").strip()
+    if configured:
+        return configured
+    return os.environ.get("GOOGLE_FORM_WEBHOOK_TOKEN", "").strip()
+
+
+def pick_first(payload: dict[str, Any], keys: list[str]) -> str:
+    for key in keys:
+        value = payload.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def normalize_iso_date(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    for fmt in ["%Y-%m-%d", "%Y/%m/%d", "%Y. %m. %d.", "%Y.%m.%d", "%Y-%m-%d %H:%M:%S"]:
+        try:
+            return datetime.strptime(text, fmt).date().isoformat()
+        except ValueError:
+            continue
+    try:
+        return date.fromisoformat(text[:10]).isoformat()
+    except ValueError:
+        return ""
+
+
+def normalize_iso_datetime(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        return ""
+    for fmt in ["%Y-%m-%d %H:%M:%S", "%Y/%m/%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S.%fZ"]:
+        try:
+            return datetime.strptime(text, fmt).isoformat(timespec="seconds")
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).isoformat(timespec="seconds")
+    except ValueError:
+        return ""
+
+
+def find_student_for_incoming_request(req: sqlite3.Row):
+    student_no = (req["student_no"] or "").strip()
+    if student_no:
+        row = query_db("SELECT id FROM students WHERE student_no = ?", (student_no,), one=True)
+        if row is not None:
+            return row
+
+    name = (req["student_name"] or "").strip()
+    grade = (req["grade"] or "").strip()
+    class_no = (req["class_no"] or "").strip()
+    if name and grade and class_no:
+        row = query_db(
+            "SELECT id FROM students WHERE name = ? AND grade = ? AND class_no = ? ORDER BY id LIMIT 1",
+            (name, grade, class_no),
+            one=True,
+        )
+        if row is not None:
+            return row
+    if name:
+        row = query_db("SELECT id FROM students WHERE name = ? ORDER BY id LIMIT 1", (name,), one=True)
+        if row is not None:
+            return row
+    return None
+
+
+def get_unread_notification_count() -> int:
+    row = query_db("SELECT COUNT(*) AS count FROM notifications WHERE is_read = 0", one=True)
+    return int(row["count"] or 0)
+
+
+def get_recent_notifications(limit: int = 5):
+    return query_db(
+        """
+        SELECT id, message, link_url, is_read, created_at
+        FROM notifications
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (max(1, int(limit)),),
+    )
 
 
 def get_app_setting(key: str, default: str = "") -> str:

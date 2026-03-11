@@ -21,6 +21,7 @@
         <a class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}" href="{{ url_for('absence_tracker') }}">미인정결석 관리</a>
         <a class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}" href="{{ url_for('stats') }}">상담 통계</a>
         <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('school_settings') }}">설정</a>
+        <a class="nav-link {% if request.path.startswith('/notifications') %}active{% endif %}" href="{{ url_for('notifications_page') }}">알림{% if unread_notification_count %}<span class="notif-badge">{{ unread_notification_count }}</span>{% endif %}</a>
         {% if g.security_configured %}
         <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
           <button class="nav-link nav-link-btn" type="submit" title="잠금">🔒</button>
@@ -30,6 +31,17 @@
       </nav>
     </div>
   </header>
+
+  {% if recent_notifications %}
+  <div class="quick-notifications">
+    <div class="quick-notifications-inner">
+      {% for n in recent_notifications %}
+      <a class="quick-notification-item {% if not n.is_read %}unread{% endif %}" href="{{ url_for('open_notification', notification_id=n.id) }}">{{ n.message }}</a>
+      {% endfor %}
+      <a class="quick-notification-more" href="{{ url_for('notifications_page') }}">전체 알림 보기</a>
+    </div>
+  </div>
+  {% endif %}
 
   {% if request.path == '/settings' or request.path.startswith('/settings/') %}
   <div class="settings-subnav-wrap">

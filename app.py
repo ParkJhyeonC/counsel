@@ -10,6 +10,8 @@ import csv
 import hashlib
 import threading
 import webbrowser
+import shutil
+import tempfile
 from urllib import error as url_error
 from urllib import request as url_request
 import json
@@ -261,6 +263,31 @@ def create_app() -> Flask:
     @app.route("/backup/download/<path:filename>")
     def download_backup(filename: str):
         return send_from_directory(BACKUP_DIR, filename, as_attachment=True)
+
+    @app.route("/backup/restore", methods=["POST"])
+    def restore_backup() -> str:
+        backup_file = request.files.get("backup_file")
+        if backup_file is None or not (backup_file.filename or "").strip():
+            flash("복원할 백업 ZIP 파일을 선택해 주세요.")
+            return redirect(url_for("index"))
+
+        if not backup_file.filename.lower().endswith(".zip"):
+            flash("ZIP 형식의 백업 파일만 복원할 수 있습니다.")
+            return redirect(url_for("index"))
+
+        db = g.pop("db", None)
+        if db is not None:
+            db.close()
+
+        try:
+            pre_restore_name = create_backup_archive(trigger="pre_restore")
+            restore_backup_archive(backup_file)
+            init_db()
+            flash(f"백업 복원이 완료되었습니다. 복원 전 상태는 {pre_restore_name} 파일로 보관했습니다.")
+        except Exception as exc:
+            flash(f"백업 복원에 실패했습니다: {exc}")
+
+        return redirect(url_for("index"))
 
     @app.route("/notifications")
     def notifications_page() -> str:
@@ -2278,6 +2305,41 @@ def create_backup_archive(trigger: str = "auto") -> str:
 
     prune_old_backups()
     return backup_name
+
+
+def restore_backup_archive(uploaded_file) -> None:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="counsel_restore_") as tmp_dir_text:
+        tmp_dir = Path(tmp_dir_text)
+        zip_path = tmp_dir / "backup.zip"
+        uploaded_file.save(zip_path)
+
+        with zipfile.ZipFile(zip_path, "r") as zip_file:
+            names = [name for name in zip_file.namelist() if not name.endswith("/")]
+            has_db = "counsel.db" in names
+            if not has_db:
+                raise ValueError("백업 파일에 counsel.db가 없습니다.")
+
+            for name in names:
+                path = Path(name)
+                if path.is_absolute() or ".." in path.parts:
+                    raise ValueError("백업 파일 경로가 올바르지 않습니다.")
+            zip_file.extractall(tmp_dir)
+
+        restored_db = tmp_dir / "counsel.db"
+        if not restored_db.exists():
+            raise ValueError("백업 파일에서 DB를 찾지 못했습니다.")
+
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(restored_db, DB_PATH)
+
+        restored_uploads = tmp_dir / "uploads"
+        if restored_uploads.exists() and restored_uploads.is_dir():
+            if UPLOAD_DIR.exists():
+                shutil.rmtree(UPLOAD_DIR)
+            shutil.copytree(restored_uploads, UPLOAD_DIR)
 
 
 def ensure_daily_auto_backup() -> str | None:

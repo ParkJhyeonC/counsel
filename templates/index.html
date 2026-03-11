@@ -87,6 +87,12 @@
   <form method="post" action="{{ url_for('create_backup') }}">
     <button class="btn" type="submit">지금 백업 생성</button>
   </form>
+  <form method="post" action="{{ url_for('restore_backup') }}" enctype="multipart/form-data" style="margin-top:.6rem;">
+    <label class="full">백업 불러오기 (ZIP)
+      <input type="file" name="backup_file" accept=".zip" required>
+    </label>
+    <button class="btn btn-secondary" type="submit" onclick="return confirm('현재 데이터가 백업 파일 내용으로 교체됩니다. 계속할까요?');">백업 복원</button>
+  </form>
   <table>
     <thead><tr><th>파일명</th><th>다운로드</th></tr></thead>
     <tbody>

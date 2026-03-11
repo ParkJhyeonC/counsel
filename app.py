@@ -1200,6 +1200,29 @@ def create_app() -> Flask:
                     execute_db("DELETE FROM school_holidays WHERE holiday_date = ?", (holiday_date,))
                     flash("임시공휴일을 삭제했습니다.")
                     return redirect(url_for("holiday_settings"))
+            elif action == "import_auto_holidays":
+                year_text = request.form.get("import_year", "").strip()
+                if not year_text.isdigit():
+                    flash("불러올 연도를 숫자로 입력해 주세요.")
+                else:
+                    year = int(year_text)
+                    if year < 2000 or year > 2100:
+                        flash("연도는 2000~2100 사이로 입력해 주세요.")
+                    else:
+                        holidays_map = get_korean_public_holidays({year})
+                        imported_count = 0
+                        for holiday_date, holiday_name in holidays_map.items():
+                            execute_db(
+                                """
+                                INSERT INTO school_holidays(holiday_date, name)
+                                VALUES (?, ?)
+                                ON CONFLICT(holiday_date) DO UPDATE SET name = excluded.name
+                                """,
+                                (holiday_date, holiday_name or "공휴일"),
+                            )
+                            imported_count += 1
+                        flash(f"{year}년 대한민국 공휴일 {imported_count}일을 불러왔습니다.")
+                        return redirect(url_for("holiday_settings"))
 
         temp_holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays ORDER BY holiday_date")
         years = {datetime.now().year}
@@ -1208,6 +1231,7 @@ def create_app() -> Flask:
             "settings_holidays.html",
             temp_holiday_rows=temp_holiday_rows,
             auto_holiday_count=len(auto_holidays),
+            import_year=datetime.now().year,
         )
 
     @app.route("/absence", methods=["GET", "POST"])

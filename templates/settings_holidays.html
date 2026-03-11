@@ -11,6 +11,14 @@
     <button class="btn" type="submit">저장</button>
   </form>
 
+  <form method="post" class="search-form" style="margin-top:.6rem;">
+    <input type="hidden" name="action" value="import_auto_holidays">
+    <label>대한민국 공휴일 불러오기(연도)
+      <input type="number" name="import_year" min="2000" max="2100" value="{{ import_year }}" required>
+    </label>
+    <button class="btn btn-secondary" type="submit">불러오기</button>
+  </form>
+
   <div class="button-row" style="margin-top:.65rem;">
     {% for h in temp_holiday_rows %}
     <form method="post" class="inline-form">

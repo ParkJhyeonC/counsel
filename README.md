@@ -129,6 +129,8 @@ scripts\build_setup_windows.bat
 - 실행 파일 폴더 빌드 (`dist\counselog`)
 - Inno Setup이 설치된 경우 설치 파일 생성 (`dist\counselog_setup.exe`)
 
+`build_setup_windows.bat`는 빌드 중 웹앱 서버를 띄우지 않고, 빌드용 가상환경만 생성해 바로 패키징을 진행합니다.
+
 > 설치본에서도 한국 공휴일 자동 계산(대체공휴일 포함)이 유지되도록 `holidays` 모듈을 PyInstaller에 함께 포함합니다.
 
 앱 홈의 **자동 백업 관리**에서 아래 작업을 할 수 있습니다.

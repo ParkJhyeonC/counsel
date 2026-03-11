@@ -21,9 +21,19 @@ echo [INFO] Windows setup build helper
 echo [INFO] Root: %ROOT_DIR%
 
 if not exist "%VENV_PY%" (
-  echo [INFO] .venv not found. Running scripts\run.bat once to bootstrap...
-  call "%ROOT_DIR%\scripts\run.bat"
-  if errorlevel 1 goto :error
+  echo [INFO] .venv not found. Creating venv for build...
+  where py >nul 2>nul
+  if %errorlevel%==0 (
+    py -3 -m venv "%ROOT_DIR%\.venv" || goto :error
+  ) else (
+    where python >nul 2>nul
+    if %errorlevel%==0 (
+      python -m venv "%ROOT_DIR%\.venv" || goto :error
+    ) else (
+      echo [ERROR] Python not found. Install Python 3.10+.
+      goto :error
+    )
+  )
 )
 
 if not exist "%VENV_PIP%" (

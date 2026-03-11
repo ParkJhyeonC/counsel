@@ -2104,7 +2104,7 @@ def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
             pass
 
     # 패키지가 없을 때 최소한의 고정 공휴일 fallback
-    fixed = {}
+    fixed: dict[str, str] = {}
     for y in years:
         for md, name in [
             ("01-01", "신정"),
@@ -2117,6 +2117,21 @@ def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
             ("12-25", "성탄절"),
         ]:
             fixed[f"{y}-{md}"] = name
+
+    # fallback에서도 대체공휴일(주말 겹침 시 다음 평일)을 최대한 반영
+    for holiday_date, holiday_name in list(fixed.items()):
+        try:
+            d = date.fromisoformat(holiday_date)
+        except ValueError:
+            continue
+        if d.weekday() not in {5, 6}:  # 토/일만 대체공휴일 생성
+            continue
+
+        substitute = d + timedelta(days=(7 - d.weekday()))
+        while substitute.isoformat() in fixed:
+            substitute += timedelta(days=1)
+        fixed[substitute.isoformat()] = f"대체공휴일({holiday_name})"
+
     return fixed
 
 

@@ -121,6 +121,7 @@ dir templates
 
 - `assets/counselog.ico`: Windows EXE / Setup 아이콘
 - `static/counselog.ico` (또는 `static/favicon.ico`): 웹 브라우저 탭 파비콘 + 트레이 아이콘
+- `static/logo.png` (또는 `logo.svg`, `logo.webp`, `logo.jpg`, `logo.jpeg`): 웹사이트 상단 헤더 로고
 
 `build_setup_windows.bat` 실행 시 `assets/counselog.ico`가 있으면 자동으로 PyInstaller `--icon` 옵션을 사용합니다.
 

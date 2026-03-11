@@ -163,6 +163,9 @@ def create_app() -> Flask:
             unread_notification_count = get_unread_notification_count()
             recent_notifications = get_recent_notifications(5)
 
+        logo_candidates = ("logo.png", "logo.svg", "logo.webp", "logo.jpg", "logo.jpeg")
+        header_logo_filename = next((name for name in logo_candidates if (STATIC_DIR / name).exists()), "")
+
         return {
             "school_name_global": school_name,
             "app_title": app_title,
@@ -170,6 +173,7 @@ def create_app() -> Flask:
             "lock_timeout_minutes": get_lock_timeout_seconds() // 60,
             "unread_notification_count": unread_notification_count,
             "recent_notifications": recent_notifications,
+            "header_logo_filename": header_logo_filename,
         }
 
     @app.route("/")

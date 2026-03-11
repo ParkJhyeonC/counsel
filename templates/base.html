@@ -11,6 +11,11 @@
   <header class="app-header">
     <div class="header-inner">
       <div class="brand-block">
+        {% if header_logo_filename %}
+        <a class="brand-logo-link" href="{{ url_for('index') }}" title="{{ app_title }}">
+          <img class="brand-logo-image" src="{{ url_for('static', filename=header_logo_filename) }}" alt="{{ app_title }} 로고">
+        </a>
+        {% endif %}
         <h1 class="logo"><a href="{{ url_for('index') }}">{{ app_title }}</a></h1>
         {% if vacation_dday_text %}<span class="vacation-dday" title="파이팅!!">{{ vacation_dday_text }}</span>{% endif %}
       </div>

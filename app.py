@@ -2402,7 +2402,7 @@ def build_external_response_id(payload: dict[str, Any]) -> str:
         return ext_id
     seed_parts = [
         pick_first(payload, ["submitted_at", "timestamp", "created_at", "타임스탬프"]),
-        pick_first(payload, ["student_name", "name", "학생", "학생명"]),
+        pick_first(payload, ["student_name", "name", "이름", "학생", "학생명"]),
         pick_first(payload, ["student_no", "학번"]),
         pick_first(payload, ["phone", "연락처", "전화번호"]),
         pick_first(payload, ["request_content", "content", "message", "상담내용", "신청내용"]),
@@ -2415,7 +2415,7 @@ def build_external_response_id(payload: dict[str, Any]) -> str:
 
 def upsert_incoming_counsel_request(payload: dict[str, Any], source: str, source_ip: str = "") -> tuple[int, bool]:
     ext_id = build_external_response_id(payload)
-    student_name = pick_first(payload, ["student_name", "name", "학생", "학생명"])
+    student_name = pick_first(payload, ["student_name", "name", "이름", "학생", "학생명"])
     student_no = pick_first(payload, ["student_no", "학번"])
     grade = pick_first(payload, ["grade", "학년"])
     class_no = pick_first(payload, ["class_no", "반"])
@@ -2546,8 +2546,17 @@ def pull_google_form_csv() -> dict[str, Any]:
 
 
 def pick_first(payload: dict[str, Any], keys: list[str]) -> str:
+    normalized_payload: dict[str, Any] = {}
+    for raw_key, raw_value in payload.items():
+        normalized_key = re.sub(r"\s+", "", str(raw_key or "").strip()).lower()
+        if normalized_key:
+            normalized_payload[normalized_key] = raw_value
+
     for key in keys:
         value = payload.get(key)
+        if value is None:
+            normalized_key = re.sub(r"\s+", "", str(key or "").strip()).lower()
+            value = normalized_payload.get(normalized_key)
         if value is None:
             continue
         text = str(value).strip()

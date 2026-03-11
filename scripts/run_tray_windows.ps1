@@ -25,7 +25,20 @@ $serverProcess.StartInfo = $startInfo
 $null = $serverProcess.Start()
 
 $notifyIcon = New-Object System.Windows.Forms.NotifyIcon
-$notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+$trayIconPathCandidates = @(
+  (Join-Path $RootDir "static\counselog.ico"),
+  (Join-Path $RootDir "static\favicon.ico")
+)
+$customIconPath = $trayIconPathCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($customIconPath) {
+  try {
+    $notifyIcon.Icon = New-Object System.Drawing.Icon($customIconPath)
+  } catch {
+    $notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+  }
+} else {
+  $notifyIcon.Icon = [System.Drawing.SystemIcons]::Information
+}
 $notifyIcon.Visible = $true
 $notifyIcon.Text = '카운슬로그 서버 실행 중'
 $notifyIcon.BalloonTipTitle = '카운슬로그'

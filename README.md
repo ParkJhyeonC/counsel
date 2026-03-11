@@ -114,6 +114,16 @@ dir templates
   반드시 `c:\프로젝트폴더\app.py` 형태(루트)에 있어야 하며, `templates` 폴더 안에 `app.py`가 있으면 안 됩니다.
 
 
+
+### 아이콘 적용(웹/실행파일/설치파일)
+
+원하는 아이콘을 다음 경로에 두면 자동으로 반영됩니다.
+
+- `assets/counselog.ico`: Windows EXE / Setup 아이콘
+- `static/counselog.ico` (또는 `static/favicon.ico`): 웹 브라우저 탭 파비콘 + 트레이 아이콘
+
+`build_setup_windows.bat` 실행 시 `assets/counselog.ico`가 있으면 자동으로 PyInstaller `--icon` 옵션을 사용합니다.
+
 ## Windows 설치 파일(Setup.exe) 만들기
 Windows 사용자 배포가 필요하면 설치 파일도 만들 수 있습니다.
 

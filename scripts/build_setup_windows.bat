@@ -13,6 +13,7 @@ if exist "%ProgramFiles(x86)%\Windows Kits\10\bin\x64\signtool.exe" set "SIGNTOO
 if not defined SIGNTOOL_EXE if exist "%ProgramFiles%\Windows Kits\10\bin\x64\signtool.exe" set "SIGNTOOL_EXE=%ProgramFiles%\Windows Kits\10\bin\x64\signtool.exe"
 set "SIGN_PFX=%SIGN_PFX%"
 set "SIGN_PFX_PASSWORD=%SIGN_PFX_PASSWORD%"
+set "APP_ICON_ICO=%ROOT_DIR%\assets\counselog.ico"
 
 if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" set "ISCC_EXE=%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
 if not defined ISCC_EXE if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC_EXE=%ProgramFiles%\Inno Setup 6\ISCC.exe"
@@ -50,7 +51,14 @@ if exist "%ROOT_DIR%\build" rmdir /s /q "%ROOT_DIR%\build"
 if exist "%ROOT_DIR%\dist" rmdir /s /q "%ROOT_DIR%\dist"
 if exist "%ROOT_DIR%\counselog.spec" del /q "%ROOT_DIR%\counselog.spec"
 
-"%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --hidden-import holidays --add-data "templates;templates" --add-data "static;static" app.py
+if exist "%APP_ICON_ICO%" (
+  echo [INFO] App icon detected: %APP_ICON_ICO%
+  "%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --hidden-import holidays --add-data "templates;templates" --add-data "static;static" --icon "%APP_ICON_ICO%" app.py
+) else (
+  echo [WARN] App icon not found: %APP_ICON_ICO%
+  echo [HINT] Put ICO file at assets\counselog.ico to brand EXE/installer icons.
+  "%VENV_PY%" -m PyInstaller --noconfirm --clean --windowed --name counselog --onedir --hidden-import holidays --add-data "templates;templates" --add-data "static;static" app.py
+)
 if errorlevel 1 goto :error
 
 

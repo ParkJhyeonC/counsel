@@ -121,9 +121,10 @@ def create_app() -> Flask:
             "lock_now",
             "password_reset",
             "static",
+            "favicon",
         }
 
-        if not security_configured and endpoint not in {"security_setup", "static"}:
+        if not security_configured and endpoint not in {"security_setup", "static", "favicon"}:
             return redirect(url_for("security_setup"))
 
         if security_configured and endpoint not in exempt_endpoints:
@@ -2021,6 +2022,14 @@ def create_app() -> Flask:
     @app.route("/uploads/<path:filename>")
     def uploaded_file(filename: str):
         return send_from_directory(UPLOAD_DIR, filename, as_attachment=True)
+
+    @app.route("/favicon.ico")
+    def favicon():
+        for name in ("counselog.ico", "favicon.ico"):
+            icon_path = STATIC_DIR / name
+            if icon_path.exists():
+                return send_from_directory(STATIC_DIR, name)
+        return "", 204
 
     @app.route("/init-db")
     def init_db_route() -> str:

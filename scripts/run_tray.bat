@@ -7,6 +7,7 @@ cd /d "%SCRIPT_DIR%.." || goto :error_root
 set "ROOT_DIR=%CD%"
 set "VENV_DIR=%ROOT_DIR%\.venv"
 set "TRAY_PS1=%SCRIPT_DIR%run_tray_windows.ps1"
+set "TRAY_SERVER=%SCRIPT_DIR%run_tray_server.py"
 
 echo [INFO] Project root: %ROOT_DIR%
 
@@ -14,6 +15,7 @@ if not exist "%ROOT_DIR%\app.py" goto :error_layout
 if not exist "%ROOT_DIR%\templates\index.html" goto :error_layout
 if not exist "%ROOT_DIR%\static\style.css" goto :error_layout
 if not exist "%TRAY_PS1%" goto :error_layout
+if not exist "%TRAY_SERVER%" goto :error_layout
 
 where py >nul 2>nul
 if %errorlevel%==0 goto :use_py_launcher
@@ -55,6 +57,7 @@ echo        %ROOT_DIR%\app.py
 echo        %ROOT_DIR%\templates\index.html
 echo        %ROOT_DIR%\static\style.css
 echo        %TRAY_PS1%
+echo        %TRAY_SERVER%
 goto :error
 
 :error

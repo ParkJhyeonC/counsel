@@ -54,6 +54,7 @@ scripts\run_tray.bat
 5. (Windows `run.bat`) 기본 브라우저 자동 열기
 
 `run_tray.bat`은 콘솔창 대신 트레이 아이콘으로 실행되며, 아이콘 우클릭으로 브라우저 열기/종료를 선택할 수 있습니다.
+트레이 실행 중 서버가 중간 종료되면 `data/run_tray.log`에 원인이 기록됩니다.
 
 ---
 

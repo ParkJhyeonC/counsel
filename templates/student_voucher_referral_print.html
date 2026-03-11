@@ -2,69 +2,170 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8">
-  <title>정신건강 심리상담 바우처사업 의뢰서</title>
+  <title>의뢰서</title>
   <style>
-    body { font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; margin: 28px; color: #111; }
-    h1 { text-align: center; margin: 0 0 18px; font-size: 24px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 14px; }
-    th, td { border: 1px solid #333; padding: 10px; vertical-align: top; font-size: 14px; }
-    th { background: #f5f5f5; width: 22%; text-align: center; }
-    .section-title { background: #efefef; font-weight: 700; }
-    .content-box { min-height: 130px; white-space: pre-wrap; }
-    .footer { margin-top: 30px; text-align: right; font-size: 14px; }
-    .print-meta { margin-top: 14px; font-size: 12px; color: #666; text-align: right; }
-    @media print { .no-print { display: none; } body { margin: 16px; } }
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      margin: 10px;
+      color: #111;
+    }
+    .doc {
+      border: 1px solid #777;
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .doc th,
+    .doc td {
+      border: 1px solid #999;
+      padding: 8px 10px;
+      vertical-align: middle;
+      font-size: 28px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .title {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 14px;
+      margin: 10px 0 18px;
+    }
+    .section-header {
+      text-align: center;
+      background: #f4f4f4;
+      font-weight: 500;
+      height: 52px;
+    }
+    .label {
+      text-align: center;
+      width: 15%;
+      background: #fafafa;
+    }
+    .small {
+      font-size: 22px;
+    }
+    .content {
+      min-height: 120px;
+      white-space: pre-wrap;
+      vertical-align: top !important;
+    }
+    .content.higher {
+      min-height: 150px;
+    }
+    .consult-label {
+      width: 15%;
+      text-align: center;
+      background: #fafafa;
+      line-height: 1.35;
+    }
+    .consult-head {
+      text-align: center;
+      background: #fafafa;
+      font-weight: 500;
+      font-size: 24px;
+    }
+    .consult-date {
+      width: 14%;
+      text-align: center;
+      font-size: 24px;
+    }
+    .consult-content {
+      width: 21%;
+      font-size: 24px;
+    }
+    .fact-row {
+      text-align: center;
+      font-size: 34px;
+      padding: 24px 0;
+      letter-spacing: 2px;
+    }
+    .date-row {
+      text-align: center;
+      font-size: 32px;
+      padding: 18px 0;
+      letter-spacing: 2px;
+    }
+    .sign-row {
+      text-align: center;
+      font-size: 34px;
+      padding: 24px 0;
+      letter-spacing: 1px;
+    }
+    .no-print {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      .no-print { display: none; }
+      body { margin: 0; }
+    }
   </style>
 </head>
 <body>
-  <div class="no-print" style="text-align:right;">
-    <button onclick="window.print()">인쇄</button>
-  </div>
+  <div class="no-print"><button onclick="window.print()">인쇄</button></div>
 
-  <h1>정신건강 심리상담 바우처사업 의뢰서</h1>
+  <div class="title">의뢰서</div>
 
-  <table>
+  <table class="doc">
     <tr>
-      <th>학교명</th>
+      <td colspan="6" class="section-header">신청자</td>
+    </tr>
+    <tr>
+      <td class="label">학교명</td>
       <td>{{ school_name }}</td>
-      <th>담당교사</th>
-      <td>{{ counselor_name or '-' }}</td>
-    </tr>
-    <tr>
-      <th>학생명</th>
+      <td class="label">학반</td>
+      <td>{{ student.grade or '-' }}-{{ student.class_no or student.class_name or '-' }}</td>
+      <td class="label">이름</td>
       <td>{{ student.name }}</td>
-      <th>학번</th>
-      <td>{{ student.student_no }}</td>
     </tr>
     <tr>
-      <th>학년/반</th>
-      <td>{{ student.grade or '-' }}학년 {{ student.class_no or student.class_name or '-' }}반</td>
-      <th>생년월일</th>
-      <td>{{ referral.birth_date or '-' }}</td>
+      <td class="label">생 년 월 일</td>
+      <td colspan="5">{{ referral.birth_date or '(0000/00/00)' }}</td>
     </tr>
     <tr>
-      <th>연락처</th>
-      <td>{{ student.phone or '-' }}</td>
-      <th>보호자 연락처</th>
-      <td>{{ student.guardian_phone or '-' }}</td>
+      <td class="label">주소</td>
+      <td colspan="5">{{ referral.address or '' }}</td>
+    </tr>
+
+    <tr>
+      <td colspan="6" class="section-header">의뢰 내용</td>
     </tr>
     <tr>
-      <th>주소</th>
-      <td colspan="3">{{ referral.address or '-' }}</td>
+      <td class="label">학생<br>주호소<br>내용</td>
+      <td colspan="5" class="content">{{ referral.chief_complaint or '' }}</td>
     </tr>
     <tr>
-      <th class="section-title">학생 주호소내용</th>
-      <td colspan="3" class="content-box">{{ referral.chief_complaint or '' }}</td>
+      <td class="label">의뢰 사유</td>
+      <td colspan="5" class="content higher">{{ referral.referral_reason or '' }}</td>
+    </tr>
+
+    <tr>
+      <td class="consult-label" rowspan="5">학생<br>상담<br>세부<br>사항</td>
+      <td class="consult-head">상담 일자</td>
+      <td class="consult-head">상담 내용</td>
+      <td class="consult-head">상담 일자</td>
+      <td class="consult-head" colspan="2">상담 내용</td>
+    </tr>
+    {% for left, right in counsel_detail_rows %}
+    <tr>
+      <td class="consult-date">{{ left.date[2:] if left and left.date else '' }}</td>
+      <td class="consult-content">{{ left.summary if left else '' }}</td>
+      <td class="consult-date">{{ right.date[2:] if right and right.date else '' }}</td>
+      <td class="consult-content" colspan="2">{{ right.summary if right else '' }}</td>
+    </tr>
+    {% endfor %}
+
+    <tr>
+      <td colspan="6" class="fact-row">위의 내용이 사실임을 증명합니다.</td>
     </tr>
     <tr>
-      <th class="section-title">의뢰 사유</th>
-      <td colspan="3" class="content-box">{{ referral.referral_reason or '' }}</td>
+      <td colspan="6" class="date-row">{{ printed_at[:4] }}년 &nbsp;&nbsp;&nbsp; {{ printed_at[5:7] }}월 &nbsp;&nbsp;&nbsp; {{ printed_at[8:10] }}일</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="sign-row">{{ school_name }} Wee클래스 전문상담교사 {{ counselor_name or '-' }} (인)</td>
     </tr>
   </table>
-
-  <div class="footer">
-    위 학생을 정신건강 심리상담 바우처사업 대상자로 의뢰합니다.
-  </div>
-  <div class="print-meta">출력일시: {{ printed_at }}</div>
 </body>
 </html>

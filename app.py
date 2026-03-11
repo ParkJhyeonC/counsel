@@ -1923,12 +1923,30 @@ def create_app() -> Flask:
         school_name = get_app_setting("school_name", "정동고등학교")
         counselor_name = get_app_setting("counselor_name", student["homeroom_teacher"] or "")
 
+        logs = query_db(
+            """
+            SELECT date, summary
+            FROM counsel_logs
+            WHERE student_id = ?
+            ORDER BY date DESC, created_at DESC
+            LIMIT 8
+            """,
+            (student_id,),
+        )
+        logs_ordered = list(reversed(logs))
+        counsel_detail_rows: list[tuple[Any | None, Any | None]] = []
+        for idx in range(0, 8, 2):
+            left = logs_ordered[idx] if idx < len(logs_ordered) else None
+            right = logs_ordered[idx + 1] if idx + 1 < len(logs_ordered) else None
+            counsel_detail_rows.append((left, right))
+
         return render_template(
             "student_voucher_referral_print.html",
             student=student,
             referral=referral,
             school_name=school_name,
             counselor_name=counselor_name,
+            counsel_detail_rows=counsel_detail_rows,
             printed_at=datetime.now().strftime("%Y-%m-%d %H:%M"),
         )
 

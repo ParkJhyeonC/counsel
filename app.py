@@ -1397,6 +1397,50 @@ def create_app() -> Flask:
         flash("가정방문 완료 처리되었습니다.")
         return redirect(url_for("absence_tracker"))
 
+    @app.route("/students/import-template")
+    def students_import_template():
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "1-1"
+        ws["A1"] = "담임: 홍길동"
+        ws["A2"] = "번호"
+        ws["B2"] = "이름"
+        ws["C2"] = "비고(선택)"
+
+        sample_rows = [
+            (1, "김학생", ""),
+            (2, "이학생", ""),
+            (3, "박학생", ""),
+        ]
+        for idx, row in enumerate(sample_rows, start=3):
+            ws.cell(row=idx, column=1, value=row[0])
+            ws.cell(row=idx, column=2, value=row[1])
+            ws.cell(row=idx, column=3, value=row[2])
+
+        ws.column_dimensions["A"].width = 10
+        ws.column_dimensions["B"].width = 18
+        ws.column_dimensions["C"].width = 22
+
+        guide = wb.create_sheet("작성가이드")
+        guide["A1"] = "명렬표 일괄등록 템플릿 사용법"
+        guide["A3"] = "1) 각 시트 이름을 '학년-반' 형식으로 입력하세요. 예: 1-4, 2-7"
+        guide["A4"] = "2) 시트 상단(1~8행 아무 곳)에 '담임: 이름' 형식으로 담임을 적으면 자동 반영됩니다."
+        guide["A5"] = "3) 학생 목록은 A열(번호), B열(이름) 기준으로 읽습니다."
+        guide["A6"] = "4) A열은 숫자만, B열 이름은 2~20자 한글/영문 권장."
+        guide["A7"] = "5) 파일의 모든 시트를 순회하여 등록/갱신합니다."
+        guide.column_dimensions["A"].width = 90
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return send_file(
+            output,
+            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            as_attachment=True,
+            download_name="학생_명렬표_일괄등록_예시.xlsx",
+        )
+
+
     @app.route("/students", methods=["GET", "POST"])
     def students() -> str:
         if request.method == "POST":

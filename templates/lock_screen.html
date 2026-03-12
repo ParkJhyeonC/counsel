@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>잠금 화면</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('favicon') }}">
+</head>
+<body>
+  <main style="max-width: 520px; margin-top: 3rem;">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <section class="card">
+      <h2>🔒 잠금 화면</h2>
+      <p class="muted">암호를 입력하면 화면 잠금이 해제됩니다.</p>
+      <form method="post" action="{{ url_for('unlock_submit') }}" class="grid-form">
+        <label class="full">암호
+          <input type="password" name="password" required autofocus>
+        </label>
+        <div class="button-row">
+          <button class="btn" type="submit">잠금 해제</button>
+          <a class="btn btn-secondary" href="{{ url_for('password_reset') }}">암호 재설정</a>
+        </div>
+      </form>
+    </section>
+  </main>
+</body>
+</html>

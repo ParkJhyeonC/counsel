@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>의뢰서</title>
+  <style>
+    body {
+      font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+      margin: 10px;
+      color: #111;
+    }
+    .doc {
+      border: 1px solid #777;
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    .doc th,
+    .doc td {
+      border: 1px solid #999;
+      padding: 8px 10px;
+      vertical-align: middle;
+      font-size: 28px;
+      line-height: 1.45;
+      word-break: break-word;
+    }
+    .title {
+      text-align: center;
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: 14px;
+      margin: 10px 0 18px;
+    }
+    .section-header {
+      text-align: center;
+      background: #f4f4f4;
+      font-weight: 500;
+      height: 52px;
+    }
+    .label {
+      text-align: center;
+      width: 15%;
+      background: #fafafa;
+    }
+    .small {
+      font-size: 22px;
+    }
+    .content {
+      min-height: 120px;
+      white-space: pre-wrap;
+      vertical-align: top !important;
+    }
+    .content.higher {
+      min-height: 150px;
+    }
+    .consult-label {
+      width: 15%;
+      text-align: center;
+      background: #fafafa;
+      line-height: 1.35;
+    }
+    .consult-head {
+      text-align: center;
+      background: #fafafa;
+      font-weight: 500;
+      font-size: 24px;
+    }
+    .consult-date {
+      width: 14%;
+      text-align: center;
+      font-size: 24px;
+    }
+    .consult-content {
+      width: 21%;
+      font-size: 24px;
+    }
+    .fact-row {
+      text-align: center;
+      font-size: 34px;
+      padding: 24px 0;
+      letter-spacing: 2px;
+    }
+    .date-row {
+      text-align: center;
+      font-size: 32px;
+      padding: 18px 0;
+      letter-spacing: 2px;
+    }
+    .sign-row {
+      text-align: center;
+      font-size: 34px;
+      padding: 24px 0;
+      letter-spacing: 1px;
+    }
+    .no-print {
+      text-align: right;
+      margin-bottom: 10px;
+    }
+    @media print {
+      @page { size: A4; margin: 10mm; }
+      .no-print { display: none; }
+      body { margin: 0; }
+    }
+  </style>
+  <link rel="icon" href="{{ url_for('favicon') }}">
+</head>
+<body>
+  <div class="no-print"><button onclick="window.print()">인쇄</button></div>
+
+  <div class="title">의뢰서</div>
+
+  <table class="doc">
+    <tr>
+      <td colspan="6" class="section-header">신청자</td>
+    </tr>
+    <tr>
+      <td class="label">학교명</td>
+      <td>{{ school_name }}</td>
+      <td class="label">학반</td>
+      <td>{{ student.grade or '-' }}-{{ student.class_no or student.class_name or '-' }}</td>
+      <td class="label">이름</td>
+      <td>{{ student.name }}</td>
+    </tr>
+    <tr>
+      <td class="label">생 년 월 일</td>
+      <td colspan="5">{{ referral.birth_date or '(0000/00/00)' }}</td>
+    </tr>
+    <tr>
+      <td class="label">주소</td>
+      <td colspan="5">{{ referral.address or '' }}</td>
+    </tr>
+
+    <tr>
+      <td colspan="6" class="section-header">의뢰 내용</td>
+    </tr>
+    <tr>
+      <td class="label">학생<br>주호소<br>내용</td>
+      <td colspan="5" class="content">{{ referral.chief_complaint or '' }}</td>
+    </tr>
+    <tr>
+      <td class="label">의뢰 사유</td>
+      <td colspan="5" class="content higher">{{ referral.referral_reason or '' }}</td>
+    </tr>
+
+    <tr>
+      <td class="consult-label" rowspan="5">학생<br>상담<br>세부<br>사항</td>
+      <td class="consult-head">상담 일자</td>
+      <td class="consult-head">상담 내용</td>
+      <td class="consult-head">상담 일자</td>
+      <td class="consult-head" colspan="2">상담 내용</td>
+    </tr>
+    {% for left, right in counsel_detail_rows %}
+    <tr>
+      <td class="consult-date">{{ left.date[2:] if left and left.date else '' }}</td>
+      <td class="consult-content">{{ left.summary if left else '' }}</td>
+      <td class="consult-date">{{ right.date[2:] if right and right.date else '' }}</td>
+      <td class="consult-content" colspan="2">{{ right.summary if right else '' }}</td>
+    </tr>
+    {% endfor %}
+
+    <tr>
+      <td colspan="6" class="fact-row">위의 내용이 사실임을 증명합니다.</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="date-row">{{ printed_at[:4] }}년 &nbsp;&nbsp;&nbsp; {{ printed_at[5:7] }}월 &nbsp;&nbsp;&nbsp; {{ printed_at[8:10] }}일</td>
+    </tr>
+    <tr>
+      <td colspan="6" class="sign-row">{{ school_name }} Wee클래스 전문상담교사 {{ counselor_name or '-' }} (인)</td>
+    </tr>
+  </table>
+</body>
+</html>

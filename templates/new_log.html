@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>상담일지 작성</h2>
+      <p class="muted">학년/반을 먼저 고르면 학생 선택이 쉬워집니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('schedule') }}">상담 일정 보기</a>
+  </div>
+  {% if prefill_schedule %}
+  <p><strong>연결 일정:</strong> {{ prefill_schedule.schedule_date }} {{ prefill_schedule.schedule_time or '' }} - {{ prefill_schedule.title }}</p>
+  {% endif %}
+  <form method="post" enctype="multipart/form-data" class="grid-form" id="log-form">
+    <input type="hidden" name="schedule_id" value="{{ prefill_schedule.id if prefill_schedule else '' }}">
+
+    <label>학년
+      <select id="grade-filter">
+        <option value="">전체</option>
+        {% for grade in grades %}
+        <option value="{{ grade }}" {% if prefill_schedule and prefill_schedule.grade == grade %}selected{% endif %}>{{ grade }}학년</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>반
+      <select id="class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+
+    <p class="form-hint full" id="student-filter-hint"></p>
+    <label class="full">학생
+      <select name="student_id" id="student-select" required>
+        <option value="">선택하세요</option>
+        {% for s in students %}
+        <option
+          value="{{ s.id }}"
+          data-grade="{{ s.grade or '' }}"
+          data-class="{{ s.class_no or '' }}"
+          {% if prefill_schedule and prefill_schedule.student_id == s.id %}selected{% endif %}>
+          {{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>상담일 <input type="date" name="date" value="{{ prefill_schedule.schedule_date if prefill_schedule else '' }}" required></label>
+    <label>대분류
+      <select name="main_category" id="main-category-select" required>
+        <option value="상담" selected>상담</option>
+        <option value="검사">검사</option>
+        <option value="자문">자문</option>
+      </select>
+    </label>
+    <label>중분류
+      <select name="sub_category" id="sub-category-select" required></select>
+    </label>
+    <label>상담구분
+      <select name="type" id="type-select" required></select>
+    </label>
+    <label class="full">상담제목 <input name="summary" value="{{ prefill_schedule.title if prefill_schedule else '' }}" required></label>
+    <label class="full">상담내용 <textarea name="detail" rows="4">{{ prefill_schedule.note if prefill_schedule else '' }}</textarea></label>
+    <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="3"></textarea></label>
+    <label>상담매체구분
+      <select name="media_type" required>
+        <option value="면담" selected>면담</option>
+        <option value="전화">전화</option>
+        <option value="사이버">사이버</option>
+      </select>
+    </label>
+    <label>상담시간(교시) <input name="counsel_period" value="{{ prefill_schedule.schedule_time if prefill_schedule else '' }}" placeholder="예: 3교시, 점심시간"></label>
+    <label>소요시간(분) <input type="number" name="duration_minutes" min="1" step="1" placeholder="예: 40"></label>
+    <label>다음 상담일 <input type="date" name="next_date"></label>
+    <label>첨부파일 <input type="file" name="attachments" multiple></label>
+    <button class="btn" type="submit">상담일지 저장</button>
+  </form>
+</section>
+
+<script>
+  const gradeClassMap = {{ grade_class_map | tojson }};
+  const gradeFilter = document.getElementById('grade-filter');
+  const classFilter = document.getElementById('class-filter');
+  const studentSelect = document.getElementById('student-select');
+  const hintEl = document.getElementById('student-filter-hint');
+
+  function fillClassOptions() {
+    const grade = gradeFilter.value;
+    const classes = grade ? (gradeClassMap[grade] || []) : [];
+    const prev = classFilter.value;
+    classFilter.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      classFilter.appendChild(opt);
+    });
+    if (classes.includes(prev)) classFilter.value = prev;
+  }
+
+  function filterStudents() {
+    const grade = gradeFilter.value;
+    const klass = classFilter.value;
+    let visibleCount = 0;
+    [...studentSelect.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
+    });
+    if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+    hintEl.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
+  }
+
+  // 연결 일정/기선택 학생이 있으면 학년-반 필터를 해당 값으로 맞춤
+  const selected = studentSelect.selectedOptions[0];
+  if (selected && selected.dataset.grade) {
+    gradeFilter.value = selected.dataset.grade;
+  }
+  fillClassOptions();
+  if (selected && selected.dataset.class) {
+    classFilter.value = selected.dataset.class;
+  }
+  filterStudents();
+
+  gradeFilter.addEventListener('change', () => {
+    fillClassOptions();
+    filterStudents();
+  });
+  classFilter.addEventListener('change', filterStudents);
+
+  const mainCategorySelect = document.getElementById('main-category-select');
+  const subCategorySelect = document.getElementById('sub-category-select');
+  const typeSelect = document.getElementById('type-select');
+  const defaultCounselTypes = {{ counsel_type_names | tojson }};
+  const categoryRules = {
+    '상담': {
+      subCategories: ['개인상담', '학부모상담', '집단상담'],
+      typesBySub: {
+        '개인상담': null,
+        '학부모상담': ['학생관련상담', '교사관련상담', '학습관련상담', '기타'],
+        '집단상담': ['학업', '진로', '학교폭력', '성격/대인관계']
+      }
+    },
+    '검사': {
+      subCategories: ['심리검사'],
+      typesBySub: {
+        '심리검사': ['개인심리검사', '집단심리검사', '기타']
+      }
+    },
+    '자문': {
+      subCategories: ['교원자문'],
+      typesBySub: {
+        '교원자문': ['학교학습', '사회성발달', '정서발달', '진로발달', '행동발달', '기타']
+      }
+    }
+  };
+
+  function refillSelect(selectEl, values, preferred) {
+    const prev = preferred ?? selectEl.value;
+    selectEl.innerHTML = '';
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      selectEl.appendChild(opt);
+    });
+    if (values.includes(prev)) selectEl.value = prev;
+  }
+
+  function syncCategorySelects() {
+    const main = mainCategorySelect.value || '상담';
+    const config = categoryRules[main] || categoryRules['상담'];
+    refillSelect(subCategorySelect, config.subCategories);
+
+    const sub = subCategorySelect.value;
+    const typeOptions = config.typesBySub[sub] || defaultCounselTypes;
+    refillSelect(typeSelect, typeOptions);
+  }
+
+  mainCategorySelect.addEventListener('change', syncCategorySelects);
+  subCategorySelect.addEventListener('change', syncCategorySelects);
+  syncCategorySelects();
+</script>
+{% endblock %}

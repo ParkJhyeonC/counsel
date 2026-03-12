@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>상담일지 수정</h2>
+      <p class="muted">기존 상담기록을 수정하고 저장할 수 있습니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=log.student_id) }}">학생 상세로 돌아가기</a>
+  </div>
+  <form method="post" class="grid-form" id="edit-log-form">
+    <label>학년
+      <select id="grade-filter">
+        <option value="">전체</option>
+        {% for grade in grades %}
+        <option value="{{ grade }}">{{ grade }}학년</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>반
+      <select id="class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+
+    <p class="form-hint full" id="edit-student-filter-hint"></p>
+    <label class="full">학생
+      <select name="student_id" id="student-select" required>
+        <option value="">선택하세요</option>
+        {% for s in students %}
+        <option value="{{ s.id }}" data-grade="{{ s.grade or '' }}" data-class="{{ s.class_no or '' }}" {% if log.student_id == s.id %}selected{% endif %}>
+          {{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <label>상담일 <input type="date" name="date" value="{{ log.date }}" required></label>
+    <label>상담구분
+      <select name="type" id="type-select" required></select>
+    </label>
+    <label class="full">상담제목 <input name="summary" value="{{ log.summary }}" required></label>
+    <label class="full">상담내용 <textarea name="detail" rows="5">{{ log.detail }}</textarea></label>
+    <label class="full">조치사항/추후계획 <textarea name="action_plan" rows="4">{{ log.action_plan }}</textarea></label>
+    <label>대분류
+      <select name="main_category" id="main-category-select" required>
+        <option value="상담" {% if (log.main_category or '상담') == '상담' %}selected{% endif %}>상담</option>
+        <option value="검사" {% if log.main_category == '검사' %}selected{% endif %}>검사</option>
+        <option value="자문" {% if log.main_category == '자문' %}selected{% endif %}>자문</option>
+      </select>
+    </label>
+    <label>중분류
+      <select name="sub_category" id="sub-category-select" required></select>
+    </label>
+    <label>상담매체구분
+      <select name="media_type" required>
+        <option value="면담" {% if (log.media_type or '면담') == '면담' %}selected{% endif %}>면담</option>
+        <option value="전화" {% if log.media_type == '전화' %}selected{% endif %}>전화</option>
+        <option value="사이버" {% if log.media_type == '사이버' %}selected{% endif %}>사이버</option>
+      </select>
+    </label>
+    <label>상담시간(교시) <input name="counsel_period" value="{{ log.counsel_period or '' }}" placeholder="예: 3교시, 점심시간"></label>
+    <label>소요시간(분) <input type="number" name="duration_minutes" min="1" step="1" value="{{ log.duration_minutes or '' }}" placeholder="예: 40"></label>
+    <label>다음 상담일 <input type="date" name="next_date" value="{{ log.next_date or '' }}"></label>
+
+    <div class="button-row full">
+      <button class="btn" type="submit">수정 저장</button>
+      <a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=log.student_id) }}">취소</a>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>기존 첨부파일</h2>
+  <ul>
+    {% for f in attachments %}
+    <li><a href="{{ url_for('uploaded_file', filename=f.file_path) }}">{{ f.original_name }}</a></li>
+    {% else %}
+    <li>첨부파일이 없습니다.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<script>
+  const gradeClassMap = {{ grade_class_map | tojson }};
+  const gradeFilter = document.getElementById('grade-filter');
+  const classFilter = document.getElementById('class-filter');
+  const studentSelect = document.getElementById('student-select');
+  const eh = document.getElementById('edit-student-filter-hint');
+
+  function fillClassOptions() {
+    const grade = gradeFilter.value;
+    const classes = grade ? (gradeClassMap[grade] || []) : [];
+    const prev = classFilter.value;
+    classFilter.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      classFilter.appendChild(opt);
+    });
+    if (classes.includes(prev)) classFilter.value = prev;
+  }
+
+  function filterStudents() {
+    const grade = gradeFilter.value;
+    const klass = classFilter.value;
+    let visibleCount = 0;
+    [...studentSelect.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
+    });
+    if (studentSelect.selectedOptions[0]?.hidden) studentSelect.value = '';
+    eh.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
+  }
+
+  // 현재 선택 학생 기준으로 초기 학년/반 세팅
+  const selected = studentSelect.selectedOptions[0];
+  if (selected && selected.dataset.grade) {
+    gradeFilter.value = selected.dataset.grade;
+  }
+  fillClassOptions();
+  if (selected && selected.dataset.class) {
+    classFilter.value = selected.dataset.class;
+  }
+  filterStudents();
+
+  gradeFilter.addEventListener('change', () => {
+    fillClassOptions();
+    filterStudents();
+  });
+  classFilter.addEventListener('change', filterStudents);
+
+  const mainCategorySelect = document.getElementById('main-category-select');
+  const subCategorySelect = document.getElementById('sub-category-select');
+  const typeSelect = document.getElementById('type-select');
+  const defaultCounselTypes = {{ counsel_type_names | tojson }};
+  const initialMain = {{ (log.main_category or '상담') | tojson }};
+  const initialSub = {{ (log.sub_category or '개인상담') | tojson }};
+  const initialType = {{ (log.type or '') | tojson }};
+  const categoryRules = {
+    '상담': {
+      subCategories: ['개인상담', '학부모상담', '집단상담'],
+      typesBySub: {
+        '개인상담': null,
+        '학부모상담': ['학생관련상담', '교사관련상담', '학습관련상담', '기타'],
+        '집단상담': ['학업', '진로', '학교폭력', '성격/대인관계']
+      }
+    },
+    '검사': {
+      subCategories: ['심리검사'],
+      typesBySub: {
+        '심리검사': ['개인심리검사', '집단심리검사', '기타']
+      }
+    },
+    '자문': {
+      subCategories: ['교원자문'],
+      typesBySub: {
+        '교원자문': ['학교학습', '사회성발달', '정서발달', '진로발달', '행동발달', '기타']
+      }
+    }
+  };
+
+  function refillSelect(selectEl, values, preferred) {
+    const prev = preferred ?? selectEl.value;
+    selectEl.innerHTML = '';
+    values.forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      selectEl.appendChild(opt);
+    });
+    if (values.includes(prev)) {
+      selectEl.value = prev;
+    } else if (prev) {
+      const opt = document.createElement('option');
+      opt.value = prev;
+      opt.textContent = `${prev} (기존값)`;
+      selectEl.appendChild(opt);
+      selectEl.value = prev;
+    }
+  }
+
+  function syncCategorySelects(preferredSub = null, preferredType = null) {
+    const main = mainCategorySelect.value || '상담';
+    const config = categoryRules[main] || categoryRules['상담'];
+    refillSelect(subCategorySelect, config.subCategories, preferredSub);
+
+    const sub = subCategorySelect.value;
+    const typeOptions = config.typesBySub[sub] || defaultCounselTypes;
+    refillSelect(typeSelect, typeOptions, preferredType);
+  }
+
+  mainCategorySelect.addEventListener('change', () => syncCategorySelects());
+  subCategorySelect.addEventListener('change', () => syncCategorySelects(subCategorySelect.value, null));
+  if (initialMain) mainCategorySelect.value = initialMain;
+  syncCategorySelects(initialSub, initialType);
+</script>
+{% endblock %}

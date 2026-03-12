@@ -4,107 +4,114 @@
   <meta charset="utf-8">
   <title>의뢰서</title>
   <style>
+    @page { size: A4; margin: 10mm; }
     body {
       font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
-      margin: 10px;
+      margin: 0;
       color: #111;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .sheet {
+      width: 100%;
+      max-width: 190mm;
+      margin: 0 auto;
     }
     .doc {
-      border: 1px solid #777;
+      border: 1px solid #666;
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
     }
     .doc th,
     .doc td {
-      border: 1px solid #999;
-      padding: 8px 10px;
+      border: 1px solid #8a8a8a;
+      padding: 6px 7px;
       vertical-align: middle;
-      font-size: 28px;
-      line-height: 1.45;
+      font-size: 13px;
       word-break: break-word;
     }
     .title {
       text-align: center;
-      font-size: 48px;
+      font-size: 30px;
       font-weight: 700;
-      letter-spacing: 14px;
-      margin: 10px 0 18px;
+      letter-spacing: 10px;
+      margin: 0 0 8px;
     }
     .section-header {
       text-align: center;
       background: #f4f4f4;
-      font-weight: 500;
-      height: 52px;
+      font-weight: 600;
+      height: 28px;
     }
     .label {
       text-align: center;
-      width: 15%;
+      width: 14%;
       background: #fafafa;
-    }
-    .small {
-      font-size: 22px;
+      font-weight: 600;
     }
     .content {
-      min-height: 120px;
+      height: 68px;
       white-space: pre-wrap;
       vertical-align: top !important;
     }
     .content.higher {
-      min-height: 150px;
+      height: 78px;
     }
     .consult-label {
-      width: 15%;
+      width: 14%;
       text-align: center;
       background: #fafafa;
-      line-height: 1.35;
+      line-height: 1.25;
+      font-weight: 600;
     }
     .consult-head {
       text-align: center;
       background: #fafafa;
-      font-weight: 500;
-      font-size: 24px;
+      font-weight: 600;
+      font-size: 12px;
     }
     .consult-date {
-      width: 14%;
+      width: 13%;
       text-align: center;
-      font-size: 24px;
+      font-size: 12px;
+      white-space: nowrap;
     }
     .consult-content {
-      width: 21%;
-      font-size: 24px;
+      width: 22%;
+      font-size: 12px;
+      line-height: 1.25;
     }
     .fact-row {
       text-align: center;
-      font-size: 34px;
-      padding: 24px 0;
-      letter-spacing: 2px;
+      font-size: 20px;
+      padding: 10px 0;
+      letter-spacing: 1px;
     }
     .date-row {
       text-align: center;
-      font-size: 32px;
-      padding: 18px 0;
-      letter-spacing: 2px;
+      font-size: 17px;
+      padding: 8px 0;
+      letter-spacing: 1px;
     }
     .sign-row {
       text-align: center;
-      font-size: 34px;
-      padding: 24px 0;
-      letter-spacing: 1px;
+      font-size: 18px;
+      padding: 10px 0;
+      letter-spacing: .5px;
     }
     .no-print {
       text-align: right;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
     @media print {
-      @page { size: A4; margin: 10mm; }
       .no-print { display: none; }
-      body { margin: 0; }
     }
   </style>
   <link rel="icon" href="{{ url_for('favicon') }}">
 </head>
 <body>
+  <div class="sheet">
   <div class="no-print"><button onclick="window.print()">인쇄</button></div>
 
   <div class="title">의뢰서</div>
@@ -168,5 +175,6 @@
       <td colspan="6" class="sign-row">{{ school_name }} Wee클래스 전문상담교사 {{ counselor_name or '-' }} (인)</td>
     </tr>
   </table>
+  </div>
 </body>
 </html>

@@ -47,7 +47,7 @@
 
 <section class="card">
   <h2>대상자 현황</h2>
-  <table>
+  <table class="absence-table">
     <thead>
       <tr>
         <th>학생</th><th>시작일</th><th>미인정결석(평일)</th><th>2일차 가정방문</th><th>7일차 경고</th><th>복귀처리</th><th>수정/삭제</th>
@@ -57,7 +57,7 @@
       {% for item in tracked %}
       <tr>
         <td>{{ item.row.grade or '-' }}학년 {{ item.row.class_no or item.row.class_name or '-' }}반 {{ item.row.student_name }}</td>
-        <td>{{ item.row.start_date }}</td>
+        <td class="absence-date-cell">{{ item.row.start_date }}</td>
         <td>
           <span class="absence-count" style="background: rgba(220, 38, 38, {{ 0.12 + item.danger_ratio * 0.55 }}); border-color: rgba(185, 28, 28, {{ 0.2 + item.danger_ratio * 0.6 }});">
             {{ item.absence_days }}일
@@ -84,7 +84,7 @@
               <span class="muted">{{ 7 - item.absence_days }}일 남음</span>
             {% endif %}
           {% else %}
-            <span class="visit-done">복귀완료 ({{ item.row.return_date or '-' }})</span>
+            <span class="visit-done absence-return-badge">복귀완료 ({{ item.row.return_date or '-' }})</span>
           {% endif %}
         </td>
         <td>
@@ -98,8 +98,8 @@
           <span class="muted">-</span>
           {% endif %}
         </td>
-        <td>
-          <div style="display:flex;gap:.35rem;align-items:center;flex-wrap:nowrap;">
+        <td class="absence-action-cell">
+          <div class="absence-action-row">
             <form method="post" class="inline-form">
               <input type="hidden" name="action" value="update_absence">
               <input type="hidden" name="absence_id" value="{{ item.row.id }}">

@@ -59,6 +59,7 @@
       <a class="subnav-link {% if request.path.startswith('/settings/lock') %}active{% endif %}" href="{{ url_for('lock_settings') }}">잠금설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/holidays') %}active{% endif %}" href="{{ url_for('holiday_settings') }}">임시공휴일 설정</a>
       <a class="subnav-link {% if request.path.startswith('/settings/vacations') %}active{% endif %}" href="{{ url_for('vacation_settings') }}">방학기간 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/power') %}active{% endif %}" href="{{ url_for('power_settings') }}">전원</a>
     </div>
   </div>
   {% endif %}

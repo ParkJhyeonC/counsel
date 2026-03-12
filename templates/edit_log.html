@@ -55,8 +55,8 @@
     <label>상담매체구분
       <select name="media_type" required>
         <option value="면담" {% if (log.media_type or '면담') == '면담' %}selected{% endif %}>면담</option>
-        <option value="전화" {% if log.media_type == '전화' %}selected{% endif %}>전화</option>
-        <option value="사이버" {% if log.media_type == '사이버' %}selected{% endif %}>사이버</option>
+        <option value="전화상담" {% if log.media_type in ['전화', '전화상담'] %}selected{% endif %}>전화상담</option>
+        <option value="사이버상담" {% if log.media_type in ['사이버', '사이버상담'] %}selected{% endif %}>사이버상담</option>
       </select>
     </label>
     <label>상담시간(교시) <input name="counsel_period" value="{{ log.counsel_period or '' }}" placeholder="예: 3교시, 점심시간"></label>

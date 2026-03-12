@@ -835,14 +835,14 @@ def create_app() -> Flask:
                 1,
                 selected_year,
                 (row["date"] or "").replace("-", ""),
-                row["grade"] or "",
+                "",
                 "",
                 row["summary"] or "",
                 row["summary"] or "",
                 hour,
                 minute,
                 "전문상담교사",
-                row["media_type"] or "면담",
+                normalize_media_type(row["media_type"]),
             ])
 
         for col in ws.columns:
@@ -1144,6 +1144,29 @@ def create_app() -> Flask:
             prefill_slot=prefill_slot,
             prefill_custom_slot=prefill_custom_slot,
         )
+
+    @app.route("/settings/power", methods=["GET", "POST"])
+    def power_settings() -> str:
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "shutdown":
+                flash("서버를 종료합니다. 창을 닫아 주세요.")
+
+                shutdown_func = request.environ.get("werkzeug.server.shutdown")
+                if callable(shutdown_func):
+                    shutdown_func()
+                    return render_template("settings_power.html", shutting_down=True)
+
+                def _force_shutdown() -> None:
+                    os._exit(0)
+
+                timer = threading.Timer(0.6, _force_shutdown)
+                timer.daemon = True
+                timer.start()
+                return render_template("settings_power.html", shutting_down=True)
+
+        return render_template("settings_power.html", shutting_down=False)
+
 
     @app.route("/settings/vacations", methods=["GET", "POST"])
     def vacation_settings() -> str:
@@ -1496,6 +1519,7 @@ def create_app() -> Flask:
             main_category = request.form.get("main_category", "").strip() or "상담"
             sub_category = request.form.get("sub_category", "").strip() or "개인상담"
             media_type = request.form.get("media_type", "").strip() or "면담"
+            media_type = normalize_media_type(media_type)
             main_category, sub_category, log_type = normalize_log_classification(main_category, sub_category, log_type)
             counsel_period = request.form.get("counsel_period", "").strip()
             duration_minutes_raw = request.form.get("duration_minutes", "").strip()
@@ -1661,6 +1685,7 @@ def create_app() -> Flask:
             main_category = request.form.get("main_category", "").strip() or "상담"
             sub_category = request.form.get("sub_category", "").strip() or "개인상담"
             media_type = request.form.get("media_type", "").strip() or "면담"
+            media_type = normalize_media_type(media_type)
             main_category, sub_category, log_type = normalize_log_classification(main_category, sub_category, log_type)
             counsel_period = request.form.get("counsel_period", "").strip()
             duration_minutes_raw = request.form.get("duration_minutes", "").strip()
@@ -2270,6 +2295,17 @@ def get_korean_public_holidays(years: set[int]) -> dict[str, str]:
         fixed[substitute.isoformat()] = f"대체공휴일({holiday_name})"
 
     return fixed
+
+
+def normalize_media_type(media_type: str | None) -> str:
+    raw = (media_type or "").strip()
+    if raw in {"면담", "전화상담", "사이버상담"}:
+        return raw
+    if raw == "전화":
+        return "전화상담"
+    if raw == "사이버":
+        return "사이버상담"
+    return "면담"
 
 
 def normalize_log_classification(main_category: str | None, sub_category: str | None, counsel_type: str | None) -> tuple[str, str, str]:

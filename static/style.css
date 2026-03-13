@@ -321,30 +321,43 @@ tr:hover td { background: #fbfdff; }
 }
 .warn-red { color: #b91c1c; }
 
-.absence-table { table-layout: fixed; }
-.absence-table th:nth-child(1) { width: 18%; }
+.absence-table-wrap { width: 100%; overflow-x: auto; }
+.absence-table {
+  table-layout: fixed;
+  min-width: 980px;
+}
+.absence-table th:nth-child(1) { width: 19%; }
 .absence-table th:nth-child(2) { width: 10%; }
 .absence-table th:nth-child(3) { width: 12%; }
 .absence-table th:nth-child(4) { width: 13%; }
-.absence-table th:nth-child(5) { width: 17%; }
-.absence-table th:nth-child(6) { width: 12%; }
-.absence-table th:nth-child(7) { width: 18%; }
-.absence-table td { vertical-align: middle; }
+.absence-table th:nth-child(5) { width: 16%; }
+.absence-table th:nth-child(6) { width: 11%; }
+.absence-table th:nth-child(7) { width: 19%; }
+.absence-table td,
+.absence-table th {
+  vertical-align: middle;
+  white-space: nowrap;
+}
 .absence-date-cell { white-space: nowrap; }
-.absence-return-badge { white-space: normal; line-height: 1.25; }
-.absence-action-cell { min-width: 220px; }
+.absence-return-badge { white-space: nowrap; line-height: 1.2; }
+.absence-action-cell { min-width: 240px; }
 .absence-action-row {
   display: flex;
   gap: .35rem;
   align-items: center;
   flex-wrap: nowrap;
 }
+.absence-action-row form {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  margin: 0;
+}
 .absence-action-row input[type="date"] { min-width: 148px; }
 .absence-action-row .btn { white-space: nowrap; }
 
 @media (max-width: 1080px) {
-  .absence-table { table-layout: auto; }
-  .absence-action-row { flex-wrap: wrap; }
+  .absence-table { min-width: 900px; }
 }
 
 .day-cell.holiday { background: #fff7f7; border-color: #fecaca; }

@@ -8,6 +8,9 @@ import zipfile
 import sys
 import csv
 import hashlib
+import hmac
+import secrets
+import struct
 import threading
 import webbrowser
 import shutil
@@ -273,11 +276,11 @@ def create_app() -> Flask:
     def restore_backup() -> str:
         backup_file = request.files.get("backup_file")
         if backup_file is None or not (backup_file.filename or "").strip():
-            flash("복원할 백업 ZIP 파일을 선택해 주세요.")
+            flash("복원할 백업 파일(.zip 또는 .zip.enc)을 선택해 주세요.")
             return redirect(url_for("index"))
 
-        if not backup_file.filename.lower().endswith(".zip"):
-            flash("ZIP 형식의 백업 파일만 복원할 수 있습니다.")
+        if not (backup_file.filename.lower().endswith(".zip") or backup_file.filename.lower().endswith(".zip.enc")):
+            flash("백업 파일은 .zip 또는 .zip.enc 형식만 복원할 수 있습니다.")
             return redirect(url_for("index"))
 
         db = g.pop("db", None)
@@ -2592,15 +2595,74 @@ def get_next_counsel_type_order() -> int:
     return row["next_order"] if row else 1
 
 
+BACKUP_ENCRYPTION_MAGIC = b"CLOGENC1"
+
+
 def list_backup_files() -> list[Path]:
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    return sorted(BACKUP_DIR.glob("counsel_backup_*.zip"), reverse=True)
+    return sorted(BACKUP_DIR.glob("counsel_backup_*"), reverse=True)
 
 
 def prune_old_backups() -> None:
     backups = list_backup_files()
     for old_file in backups[MAX_BACKUP_FILES:]:
         old_file.unlink(missing_ok=True)
+
+
+def get_backup_passphrase() -> str:
+    return os.environ.get("COUNSELOG_BACKUP_PASSPHRASE", "").strip()
+
+
+def derive_backup_keys(passphrase: str, salt: bytes) -> tuple[bytes, bytes]:
+    key_material = hashlib.pbkdf2_hmac("sha256", passphrase.encode("utf-8"), salt, 200_000, dklen=64)
+    return key_material[:32], key_material[32:]
+
+
+def xor_stream(data: bytes, key: bytes, nonce: bytes) -> bytes:
+    out = bytearray(len(data))
+    offset = 0
+    counter = 0
+    while offset < len(data):
+        counter_bytes = struct.pack(">I", counter)
+        block = hashlib.sha256(key + nonce + counter_bytes).digest()
+        for b in block:
+            if offset >= len(data):
+                break
+            out[offset] = data[offset] ^ b
+            offset += 1
+        counter += 1
+    return bytes(out)
+
+
+def encrypt_backup_bytes(raw_zip: bytes, passphrase: str) -> bytes:
+    salt = secrets.token_bytes(16)
+    nonce = secrets.token_bytes(16)
+    enc_key, mac_key = derive_backup_keys(passphrase, salt)
+    ciphertext = xor_stream(raw_zip, enc_key, nonce)
+    mac = hmac.new(mac_key, BACKUP_ENCRYPTION_MAGIC + salt + nonce + ciphertext, hashlib.sha256).digest()
+    return BACKUP_ENCRYPTION_MAGIC + salt + nonce + ciphertext + mac
+
+
+def decrypt_backup_bytes(enc_blob: bytes, passphrase: str) -> bytes:
+    if not enc_blob.startswith(BACKUP_ENCRYPTION_MAGIC):
+        return enc_blob
+
+    min_len = len(BACKUP_ENCRYPTION_MAGIC) + 16 + 16 + 32
+    if len(enc_blob) < min_len:
+        raise ValueError("암호화된 백업 파일 형식이 올바르지 않습니다.")
+
+    base = len(BACKUP_ENCRYPTION_MAGIC)
+    salt = enc_blob[base : base + 16]
+    nonce = enc_blob[base + 16 : base + 32]
+    mac = enc_blob[-32:]
+    ciphertext = enc_blob[base + 32 : -32]
+
+    enc_key, mac_key = derive_backup_keys(passphrase, salt)
+    expected_mac = hmac.new(mac_key, BACKUP_ENCRYPTION_MAGIC + salt + nonce + ciphertext, hashlib.sha256).digest()
+    if not hmac.compare_digest(mac, expected_mac):
+        raise ValueError("백업 암호가 다르거나 파일이 손상되었습니다.")
+
+    return xor_stream(ciphertext, enc_key, nonce)
 
 
 def create_backup_archive(trigger: str = "auto") -> str:
@@ -2618,6 +2680,14 @@ def create_backup_archive(trigger: str = "auto") -> str:
                     arcname = Path("uploads") / file_path.relative_to(UPLOAD_DIR)
                     zip_file.write(file_path, arcname=str(arcname))
 
+    passphrase = get_backup_passphrase()
+    if passphrase:
+        encrypted_blob = encrypt_backup_bytes(backup_path.read_bytes(), passphrase)
+        encrypted_path = backup_path.with_suffix(backup_path.suffix + ".enc")
+        encrypted_path.write_bytes(encrypted_blob)
+        backup_path.unlink(missing_ok=True)
+        backup_name = encrypted_path.name
+
     prune_old_backups()
     return backup_name
 
@@ -2628,8 +2698,20 @@ def restore_backup_archive(uploaded_file) -> None:
 
     with tempfile.TemporaryDirectory(prefix="counsel_restore_") as tmp_dir_text:
         tmp_dir = Path(tmp_dir_text)
+        raw_path = tmp_dir / "backup_input"
+        uploaded_file.save(raw_path)
+
+        raw_bytes = raw_path.read_bytes()
+        if raw_bytes.startswith(BACKUP_ENCRYPTION_MAGIC):
+            passphrase = get_backup_passphrase()
+            if not passphrase:
+                raise ValueError("암호화 백업을 복원하려면 COUNSELOG_BACKUP_PASSPHRASE 환경변수를 설정해 주세요.")
+            zip_bytes = decrypt_backup_bytes(raw_bytes, passphrase)
+        else:
+            zip_bytes = raw_bytes
+
         zip_path = tmp_dir / "backup.zip"
-        uploaded_file.save(zip_path)
+        zip_path.write_bytes(zip_bytes)
 
         with zipfile.ZipFile(zip_path, "r") as zip_file:
             names = [name for name in zip_file.namelist() if not name.endswith("/")]

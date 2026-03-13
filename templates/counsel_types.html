@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>상담유형 관리</h2>
+  <p class="muted">상담일지 작성/수정 화면에 표시될 상담유형을 추가/수정/삭제할 수 있습니다.</p>
+
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="add">
+    <label>새 상담유형
+      <input name="name" placeholder="예: 또래관계" required>
+    </label>
+    <div class="button-row" style="align-self:end;">
+      <button class="btn" type="submit">상담유형 추가</button>
+    </div>
+  </form>
+</section>
+
+<section class="card">
+  <h2>등록된 상담유형</h2>
+  <table>
+    <thead><tr><th>유형명</th><th>수정</th><th>삭제</th></tr></thead>
+    <tbody>
+      {% for ct in counsel_types %}
+      <tr>
+        <td>{{ ct.name }}</td>
+        <td>
+          <form method="post" class="button-row">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="type_id" value="{{ ct.id }}">
+            <input name="name" value="{{ ct.name }}" required>
+            <button class="btn btn-secondary" type="submit">수정</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" onsubmit="return confirm('상담유형을 삭제할까요?');">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="type_id" value="{{ ct.id }}">
+            <button class="btn btn-danger" type="submit">삭제</button>
+          </form>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">등록된 상담유형이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

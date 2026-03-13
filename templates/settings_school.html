@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>학교 설정</h2>
+  <p class="muted">여기서 설정한 학교명/전문상담교사명은 상담확인증 출력에 자동 반영됩니다.</p>
+
+  <form method="post" class="grid-form">
+    <label class="full">학교 이름
+      <input name="school_name" value="{{ school_name }}" placeholder="예: 정동고등학교" required>
+    </label>
+    <label class="full">전문상담교사
+      <input name="counselor_name" value="{{ counselor_name }}" placeholder="예: 홍길동" required>
+    </label>
+    <button class="btn" type="submit">설정 저장</button>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:.6rem 0;">
+  <h3 style="margin:.8rem 0 .35rem;">Google Form 연동(Pull)</h3>
+  <p class="muted">Google Sheets를 웹에 게시한 CSV URL을 저장하면, 수동 또는 자동 간격으로 동기화할 수 있습니다.</p>
+  <label class="full">CSV URL
+    <input name="google_form_pull_csv_url" value="{{ pull_csv_url or '' }}" placeholder="https://docs.google.com/spreadsheets/d/.../gviz/tq?tqx=out:csv&sheet=폼응답1">
+  </label>
+  <div class="full" style="margin-top:-.2rem;">
+    <p class="muted" style="margin:.15rem 0 .35rem;">권장 Google Form 문항(컬럼명) 예시</p>
+    <div class="muted" style="font-size:.92rem;line-height:1.5;background:#f8fafc;border:1px solid #dbe5f3;border-radius:10px;padding:.65rem .75rem;">
+      <div><strong>필수</strong>: 이름, 학년, 반, 상담희망일, 상담희망시간, 상담내용</div>
+      <div><strong>선택</strong>: 학번, 전화번호, 상담제목</div>
+      <div style="margin-top:.35rem;">CSV 헤더 예시: <code>타임스탬프,이름,학년,반,학번,전화번호,상담희망일,상담희망시간,상담제목,상담내용</code></div>
+    </div>
+  </div>
+  <label>자동 동기화 사용
+    <select name="google_form_pull_auto_sync_enabled">
+      <option value="0" {% if not pull_auto_sync_enabled %}selected{% endif %}>사용 안 함</option>
+      <option value="1" {% if pull_auto_sync_enabled %}selected{% endif %}>사용</option>
+    </select>
+  </label>
+  <label>자동 동기화 간격(분)
+    <input type="number" name="google_form_pull_interval_minutes" min="1" max="1440" value="{{ pull_interval_minutes }}">
+  </label>
+  <p class="full muted">마지막 동기화 시각: {{ pull_last_at or '아직 없음' }}</p>
+  <button class="btn" type="submit">저장</button>
+</form>
+<form method="post" action="{{ url_for('google_form_pull') }}" style="margin-top:.7rem;">
+  <button class="btn btn-secondary" type="submit">지금 Pull 동기화 실행</button>
+</form>
+</section>
+{% endblock %}

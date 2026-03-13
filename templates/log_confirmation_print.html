@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>상담 확인증</title>
+  <style>
+    body { font-family: 'Noto Sans KR', Arial, sans-serif; margin: 20px; color:#111; }
+    .toolbar { margin-bottom: 12px; }
+    .toolbar button, .toolbar a { margin-right: 8px; }
+    .paper { max-width: 800px; margin: 0 auto; border: 2px solid #222; padding: 22px; }
+    h1 { text-align:center; letter-spacing: .45em; margin: 12px 0 20px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border:1px solid #333; padding: 8px; font-size:14px; }
+    th { width: 110px; background:#f8fafc; }
+    .content { min-height: 160px; vertical-align: top; }
+    .foot { text-align:center; margin-top: 36px; line-height: 1.9; }
+    @media print { .toolbar { display:none; } body { margin:0; } .paper { border-width:1px; } }
+  </style>
+  <link rel="icon" href="{{ url_for('favicon') }}">
+</head>
+<body>
+  <div class="toolbar">
+    <button onclick="window.print()">인쇄 / PDF 저장</button>
+    <a href="{{ url_for('student_detail', student_id=log.student_id) }}">학생 상세로 돌아가기</a>
+  </div>
+
+  <section class="paper">
+    <h1>상담확인증</h1>
+    <table>
+      <tr>
+        <th>성명</th><td>{{ log.student_name }}</td>
+        <th>학 반</th><td>{% if log.grade and log.class_no %}{{ log.grade }}학년 {{ log.class_no }}반{% elif log.class_name %}{{ log.class_name }}{% else %}-{% endif %}</td>
+      </tr>
+      <tr>
+        <th>상담유형</th><td>{{ log.type }}</td>
+        <th>상담자</th><td>{{ counselor_name }}</td>
+      </tr>
+      <tr>
+        <th>상담일시</th><td colspan="3">{{ log.date }} {% if log.counsel_period %}{{ log.counsel_period }}{% endif %}</td>
+      </tr>
+      <tr>
+        <th>상담내용</th><td colspan="3" class="content">{{ log.summary }}</td>
+      </tr>
+    </table>
+
+    <div class="foot">
+      상기 대상자는 Wee클래스에 내방하여<br>
+      위와 같이 상담하였음을 확인합니다.<br><br>
+      {{ printed_at }}<br><br>
+      <strong>{{ school_name }} Wee클래스</strong>
+    </div>
+  </section>
+</body>
+</html>

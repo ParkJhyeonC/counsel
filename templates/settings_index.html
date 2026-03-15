@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>설정</h2>
+  <p class="muted">환경 설정 항목을 선택해 관리하세요.</p>
+  <div class="button-row" style="margin-top:.4rem;">
+    <a class="btn" href="{{ url_for('school_settings') }}">학교 설정</a>
+    <a class="btn" href="{{ url_for('ai_settings') }}">AI 설정</a>
+    <a class="btn" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
+    <a class="btn" href="{{ url_for('schedule_slots_settings') }}">시간/교시 설정</a>
+    <a class="btn" href="{{ url_for('lock_settings') }}">잠금설정</a>
+    <a class="btn" href="{{ url_for('backup_settings') }}">백업 암호화</a>
+    <a class="btn" href="{{ url_for('holiday_settings') }}">임시공휴일 설정</a>
+    <a class="btn" href="{{ url_for('vacation_settings') }}">방학기간 설정</a>
+  </div>
+</section>
+{% endblock %}

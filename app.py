@@ -284,13 +284,15 @@ def create_app() -> Flask:
             flash("백업 파일은 .zip 또는 .zip.enc 형식만 복원할 수 있습니다.")
             return redirect(url_for("index"))
 
-        db = g.pop("db", None)
-        if db is not None:
-            db.close()
-
+        backup_passphrase = get_backup_passphrase()
         try:
             pre_restore_name = create_backup_archive(trigger="pre_restore")
-            restore_backup_archive(backup_file)
+
+            db = g.pop("db", None)
+            if db is not None:
+                db.close()
+
+            restore_backup_archive(backup_file, backup_passphrase=backup_passphrase)
             init_db()
             flash(f"백업 복원이 완료되었습니다. 복원 전 상태는 {pre_restore_name} 파일로 보관했습니다.")
         except Exception as exc:
@@ -2970,7 +2972,7 @@ def create_backup_archive(trigger: str = "auto") -> str:
     return backup_name
 
 
-def restore_backup_archive(uploaded_file) -> None:
+def restore_backup_archive(uploaded_file, backup_passphrase: str = "") -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2981,9 +2983,9 @@ def restore_backup_archive(uploaded_file) -> None:
 
         raw_bytes = raw_path.read_bytes()
         if raw_bytes.startswith(BACKUP_ENCRYPTION_MAGIC):
-            passphrase = get_backup_passphrase()
+            passphrase = (backup_passphrase or "").strip() or get_backup_passphrase()
             if not passphrase:
-                raise ValueError("암호화 백업을 복원하려면 COUNSELOG_BACKUP_PASSPHRASE 환경변수를 설정해 주세요.")
+                raise ValueError("암호화 백업을 복원하려면 백업 암호를 설정해 주세요.")
             zip_bytes = decrypt_backup_bytes(raw_bytes, passphrase)
         else:
             zip_bytes = raw_bytes

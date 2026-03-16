@@ -2993,25 +2993,30 @@ def restore_backup_archive(uploaded_file) -> None:
 
         with zipfile.ZipFile(zip_path, "r") as zip_file:
             names = [name for name in zip_file.namelist() if not name.endswith("/")]
-            has_db = "counsel.db" in names
-            if not has_db:
-                raise ValueError("백업 파일에 counsel.db가 없습니다.")
-
             for name in names:
                 path = Path(name)
                 if path.is_absolute() or ".." in path.parts:
                     raise ValueError("백업 파일 경로가 올바르지 않습니다.")
+
+            db_candidates = [name for name in names if Path(name).name == "counsel.db"]
+            if not db_candidates:
+                raise ValueError("백업 파일에 counsel.db가 없습니다.")
+
             zip_file.extractall(tmp_dir)
 
-        restored_db = tmp_dir / "counsel.db"
-        if not restored_db.exists():
+        restored_db = next((tmp_dir / rel for rel in db_candidates if (tmp_dir / rel).exists()), None)
+        if restored_db is None:
             raise ValueError("백업 파일에서 DB를 찾지 못했습니다.")
 
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(restored_db, DB_PATH)
 
-        restored_uploads = tmp_dir / "uploads"
-        if restored_uploads.exists() and restored_uploads.is_dir():
+        upload_candidates = [
+            tmp_dir / "uploads",
+            tmp_dir / "data" / "uploads",
+        ]
+        restored_uploads = next((cand for cand in upload_candidates if cand.exists() and cand.is_dir()), None)
+        if restored_uploads is not None:
             if UPLOAD_DIR.exists():
                 shutil.rmtree(UPLOAD_DIR)
             shutil.copytree(restored_uploads, UPLOAD_DIR)

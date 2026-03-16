@@ -1682,22 +1682,17 @@ def create_app() -> Flask:
                     )
                     flash("연결된 상담 일정이 완료 처리되었습니다.")
 
-                if next_date:
-                    execute_db(
-                        """
-                        INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at)
-                        VALUES (?, ?, ?, ?, ?, 'planned', ?)
-                        """,
-                        (
-                            student_id,
-                            next_date,
-                            None,
-                            f"후속상담 - {summary}",
-                            action_plan,
-                            datetime.now().isoformat(timespec="seconds"),
-                        ),
-                    )
+                followup_result = sync_followup_schedule_for_log(
+                    log_id=log_id,
+                    student_id=int(student_id),
+                    next_date=next_date,
+                    summary=summary,
+                    action_plan=action_plan,
+                )
+                if followup_result == "created":
                     flash("다음 상담일이 일정에 자동 등록되었습니다.")
+                elif followup_result == "updated":
+                    flash("다음 상담일 일정이 자동 업데이트되었습니다.")
 
                 flash("상담일지가 저장되었습니다.")
                 return redirect(url_for("student_detail", student_id=student_id))
@@ -1811,6 +1806,19 @@ def create_app() -> Flask:
                         log_id,
                     ),
                 )
+                followup_result = sync_followup_schedule_for_log(
+                    log_id=log_id,
+                    student_id=int(student_id),
+                    next_date=next_date,
+                    summary=summary,
+                    action_plan=action_plan,
+                )
+                if followup_result == "created":
+                    flash("다음 상담일이 일정에 자동 등록되었습니다.")
+                elif followup_result == "updated":
+                    flash("다음 상담일 일정이 자동 업데이트되었습니다.")
+                elif followup_result == "deleted":
+                    flash("비어 있는 다음 상담일 일정은 자동 삭제되었습니다.")
                 flash("상담일지를 수정했습니다.")
                 return redirect(url_for("student_detail", student_id=student_id))
 
@@ -1841,6 +1849,7 @@ def create_app() -> Flask:
             (UPLOAD_DIR / file_row["file_path"]).unlink(missing_ok=True)
 
         execute_db("DELETE FROM attachments WHERE log_id = ?", (log_id,))
+        execute_db("DELETE FROM counsel_schedules WHERE linked_log_id = ?", (log_id,))
         execute_db("DELETE FROM counsel_logs WHERE id = ?", (log_id,))
         flash("상담일지를 삭제했습니다.")
         return redirect(url_for("student_detail", student_id=log_row["student_id"]))
@@ -2167,6 +2176,49 @@ def get_db() -> sqlite3.Connection:
     return conn
 
 
+def sync_followup_schedule_for_log(
+    log_id: int,
+    student_id: int,
+    next_date: str,
+    summary: str,
+    action_plan: str,
+) -> str:
+    existing = query_db(
+        "SELECT id FROM counsel_schedules WHERE linked_log_id = ? ORDER BY id LIMIT 1",
+        (log_id,),
+        one=True,
+    )
+    if not next_date:
+        if existing is not None:
+            execute_db("DELETE FROM counsel_schedules WHERE linked_log_id = ?", (log_id,))
+            return "deleted"
+        return "none"
+
+    title = f"후속상담 - {(summary or '상담').strip()}"
+    note = (action_plan or "").strip() or None
+    now = datetime.now().isoformat(timespec="seconds")
+
+    if existing is not None:
+        execute_db(
+            """
+            UPDATE counsel_schedules
+            SET student_id = ?, schedule_date = ?, schedule_time = NULL, title = ?, note = ?, status = 'planned'
+            WHERE linked_log_id = ?
+            """,
+            (student_id, next_date, title, note, log_id),
+        )
+        return "updated"
+
+    execute_db(
+        """
+        INSERT INTO counsel_schedules(student_id, schedule_date, schedule_time, title, note, status, created_at, linked_log_id)
+        VALUES (?, ?, NULL, ?, ?, 'planned', ?, ?)
+        """,
+        (student_id, next_date, title, note, now, log_id),
+    )
+    return "created"
+
+
 def init_db() -> None:
     conn = get_db()
     with conn:
@@ -2319,6 +2371,7 @@ def init_db() -> None:
         add_column_if_missing(conn, "counsel_logs", "media_type", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "counsel_period", "TEXT")
         add_column_if_missing(conn, "counsel_logs", "duration_minutes", "INTEGER")
+        add_column_if_missing(conn, "counsel_schedules", "linked_log_id", "INTEGER")
         add_column_if_missing(conn, "unexcused_absences", "is_active", "INTEGER NOT NULL DEFAULT 1")
         add_column_if_missing(conn, "unexcused_absences", "return_date", "TEXT")
         seed_default_counsel_types(conn)

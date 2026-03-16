@@ -91,6 +91,9 @@
     <label class="full">백업 불러오기 (.zip / .zip.enc)
       <input type="file" name="backup_file" accept=".zip,.enc,.zip.enc" required>
     </label>
+    <label class="full">백업 암호 (암호화 .enc 파일인 경우)
+      <input type="password" name="backup_passphrase" placeholder="미입력 시 설정된 암호 사용">
+    </label>
     <button class="btn btn-secondary" type="submit" onclick="return confirm('현재 데이터가 백업 파일 내용으로 교체됩니다. 계속할까요?');">백업 복원</button>
   </form>
   <table>

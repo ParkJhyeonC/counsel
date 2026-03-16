@@ -284,7 +284,8 @@ def create_app() -> Flask:
             flash("백업 파일은 .zip 또는 .zip.enc 형식만 복원할 수 있습니다.")
             return redirect(url_for("index"))
 
-        backup_passphrase = get_backup_passphrase()
+        input_passphrase = request.form.get("backup_passphrase", "").strip()
+        backup_passphrase = input_passphrase or get_backup_passphrase()
         try:
             pre_restore_name = create_backup_archive(trigger="pre_restore")
 

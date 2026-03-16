@@ -2599,8 +2599,8 @@ def get_or_create_neis_import_student_id() -> int:
 
     return execute_db(
         """
-        INSERT INTO students(student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO students(student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             "NEIS_IMPORT",
@@ -2612,7 +2612,6 @@ def get_or_create_neis_import_student_id() -> int:
             "",
             "",
             "나이스 월간 업로드 양식에서 불러온 상담일지 임시 학생",
-            datetime.now().isoformat(timespec="seconds"),
         ),
     )
 

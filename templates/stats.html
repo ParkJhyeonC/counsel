@@ -31,6 +31,15 @@
     나이스 업로드용 상담구분은 자동 보정됩니다: 학부모상담(학생관련상담/교사관련상담/학습관련상담/기타), 집단상담(학업/진로/학교폭력/성격/대인관계).
   </p>
 
+  <form method="post" action="{{ url_for('stats_neis_monthly_import') }}" enctype="multipart/form-data" class="search-form" style="margin-top:.6rem;">
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    <label class="full">월간통계(나이스 업로드) 엑셀 불러오기 (.xlsx)
+      <input type="file" name="neis_excel" accept=".xlsx" required>
+    </label>
+    <button class="btn btn-secondary" type="submit">엑셀 불러와 상담일지 저장</button>
+  </form>
+  <p class="muted" style="margin-top:.25rem;">내보내기와 동일한 헤더 양식(.xlsx) 파일을 업로드하면 상담일지를 일괄 등록합니다. 불러온 데이터는 <strong>학생관리 &gt; 나이스 불러오기(NEIS_IMPORT)</strong> 학생으로 저장됩니다.</p>
+
   <div class="stats-bars">
     {% set max_count = (monthly_stats | map(attribute='count') | max) if monthly_stats else 0 %}
     {% for item in monthly_stats %}

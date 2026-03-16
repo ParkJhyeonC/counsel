@@ -904,6 +904,29 @@ def create_app() -> Flask:
             download_name=filename,
         )
 
+    @app.route("/stats/neis-import", methods=["POST"])
+    def stats_neis_monthly_import() -> str:
+        selected_year = request.form.get("year", str(datetime.now().year)).strip()
+        if not selected_year.isdigit():
+            selected_year = str(datetime.now().year)
+
+        excel_file = request.files.get("neis_excel")
+        if excel_file is None or not (excel_file.filename or "").strip():
+            flash("불러올 나이스 엑셀 파일(.xlsx)을 선택해 주세요.")
+            return redirect(url_for("stats", year=selected_year))
+
+        if not (excel_file.filename or "").lower().endswith(".xlsx"):
+            flash(".xlsx 형식 파일만 불러올 수 있습니다.")
+            return redirect(url_for("stats", year=selected_year))
+
+        try:
+            imported, skipped = import_counsel_logs_from_neis_excel(excel_file.stream)
+            flash(f"나이스 엑셀 불러오기 완료: {imported}건 저장, {skipped}건 건너뜀")
+        except Exception as exc:
+            flash(f"나이스 엑셀 처리 중 오류가 발생했습니다: {exc}")
+
+        return redirect(url_for("stats", year=selected_year))
+
     @app.route("/stats/annual-ledger")
     def stats_annual_ledger() -> str:
         selected_year = request.args.get("year", str(datetime.now().year)).strip()
@@ -2567,6 +2590,168 @@ def parse_homeroom_teacher(ws) -> str:
             if match:
                 return match.group(1).strip()
     return ""
+
+
+def get_or_create_neis_import_student_id() -> int:
+    row = query_db("SELECT id FROM students WHERE student_no = ?", ("NEIS_IMPORT",), one=True)
+    if row is not None:
+        return int(row["id"])
+
+    return execute_db(
+        """
+        INSERT INTO students(student_no, name, grade, class_no, class_name, homeroom_teacher, phone, guardian_phone, note, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            "NEIS_IMPORT",
+            "나이스 불러오기",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            "나이스 월간 업로드 양식에서 불러온 상담일지 임시 학생",
+            datetime.now().isoformat(timespec="seconds"),
+        ),
+    )
+
+
+def parse_neis_excel_headers(header_cells: list[Any]) -> dict[str, int]:
+    aliases = {
+        "대분류": "main_category",
+        "중분류": "sub_category",
+        "상담구분": "counsel_type",
+        "상담일자": "date",
+        "상담제목": "summary",
+        "상담내용": "detail",
+        "상담시간(시)": "hour",
+        "상담시간(분)": "minute",
+        "상담매체구분": "media_type",
+    }
+    mapping: dict[str, int] = {}
+    for idx, cell in enumerate(header_cells):
+        raw = str(cell or "").strip().replace("*", "")
+        key = aliases.get(raw)
+        if key:
+            mapping[key] = idx
+    required = {"main_category", "sub_category", "counsel_type", "date", "summary"}
+    missing = required - set(mapping.keys())
+    if missing:
+        raise ValueError("나이스 양식 헤더를 찾지 못했습니다. 내보낸 월간통계 양식을 그대로 사용해 주세요.")
+    return mapping
+
+
+def import_counsel_logs_from_neis_excel(file_stream) -> tuple[int, int]:
+    wb = load_workbook(filename=file_stream, data_only=True)
+    ws = wb.active
+    rows = ws.iter_rows(values_only=True)
+
+    header = next(rows, None)
+    if header is None:
+        raise ValueError("엑셀 파일이 비어 있습니다.")
+
+    mapping = parse_neis_excel_headers(list(header))
+    student_id = get_or_create_neis_import_student_id()
+
+    imported = 0
+    skipped = 0
+
+    for row in rows:
+        if not row:
+            continue
+
+        def val(name: str) -> str:
+            idx = mapping.get(name)
+            if idx is None or idx >= len(row):
+                return ""
+            v = row[idx]
+            return "" if v is None else str(v).strip()
+
+        main_category = val("main_category") or "상담"
+        sub_category = val("sub_category") or "개인상담"
+        raw_type = val("counsel_type") or "기타"
+        summary = val("summary")
+        detail = val("detail") or summary
+        date_text = val("date")
+        media_type = normalize_media_type(val("media_type") or "면담")
+
+        if not summary or not date_text:
+            skipped += 1
+            continue
+
+        normalized_date = normalize_neis_date_to_iso(date_text)
+        if not normalized_date:
+            skipped += 1
+            continue
+
+        hour = safe_int(val("hour"))
+        minute = safe_int(val("minute"))
+        duration_minutes = max(0, hour * 60 + minute) or None
+
+        main_category, sub_category, log_type = normalize_log_classification(main_category, sub_category, raw_type)
+
+        exists = query_db(
+            """
+            SELECT id FROM counsel_logs
+            WHERE student_id = ? AND date = ? AND summary = ? AND COALESCE(detail, '') = ?
+              AND COALESCE(main_category, '') = ? AND COALESCE(sub_category, '') = ?
+            LIMIT 1
+            """,
+            (student_id, normalized_date, summary, detail, main_category, sub_category),
+            one=True,
+        )
+        if exists is not None:
+            skipped += 1
+            continue
+
+        execute_db(
+            """
+            INSERT INTO counsel_logs(
+                student_id, date, type, summary, detail, action_plan,
+                main_category, sub_category, media_type,
+                counsel_period, duration_minutes, next_date, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                student_id,
+                normalized_date,
+                log_type,
+                summary,
+                detail,
+                "",
+                main_category,
+                sub_category,
+                media_type,
+                None,
+                duration_minutes,
+                None,
+                datetime.now().isoformat(timespec="seconds"),
+            ),
+        )
+        imported += 1
+
+    return imported, skipped
+
+
+def normalize_neis_date_to_iso(raw: str) -> str | None:
+    digits = re.sub(r"\D", "", raw or "")
+    if len(digits) != 8:
+        return None
+    yyyy, mm, dd = digits[:4], digits[4:6], digits[6:8]
+    try:
+        date(int(yyyy), int(mm), int(dd))
+    except ValueError:
+        return None
+    return f"{yyyy}-{mm}-{dd}"
+
+
+def safe_int(raw: str) -> int:
+    try:
+        return max(0, int(float((raw or "0").strip())))
+    except (ValueError, TypeError):
+        return 0
 
 
 def import_students_from_excel(file_stream) -> tuple[int, int]:

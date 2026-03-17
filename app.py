@@ -1037,6 +1037,36 @@ def create_app() -> Flask:
             )
 
         if request.method == "POST":
+            action = request.form.get("action", "save").strip()
+            if action == "delete_schedule":
+                schedule_id_raw = request.form.get("schedule_id", "").strip()
+                redirect_date = request.form.get("selected_date", selected_date).strip() or selected_date
+                redirect_month = request.form.get("selected_month", selected_date[:7]).strip() or selected_date[:7]
+                if not schedule_id_raw.isdigit():
+                    flash("삭제할 일정을 찾을 수 없습니다.")
+                else:
+                    row = query_db(
+                        "SELECT id, status FROM counsel_schedules WHERE id = ?",
+                        (int(schedule_id_raw),),
+                        one=True,
+                    )
+                    if row is None:
+                        flash("삭제할 일정을 찾을 수 없습니다.")
+                    elif row["status"] != "planned":
+                        flash("완료된 일정은 삭제할 수 없습니다.")
+                    else:
+                        execute_db("DELETE FROM counsel_schedules WHERE id = ?", (int(schedule_id_raw),))
+                        execute_db(
+                            """
+                            UPDATE incoming_counsel_requests
+                            SET status = 'new', linked_schedule_id = NULL, updated_at = ?
+                            WHERE linked_schedule_id = ?
+                            """,
+                            (datetime.now().isoformat(timespec="seconds"), int(schedule_id_raw)),
+                        )
+                        flash("상담 일정을 삭제했습니다.")
+                return redirect(url_for("schedule", date=redirect_date, month=redirect_month))
+
             student_id = request.form.get("student_id", "").strip()
             schedule_date = request.form.get("schedule_date", "").strip()
             schedule_slot = request.form.get("schedule_slot", "").strip()

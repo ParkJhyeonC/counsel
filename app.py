@@ -1451,7 +1451,15 @@ def create_app() -> Flask:
                 start = date.fromisoformat(row["start_date"])
             except ValueError:
                 continue
-            absence_days = business_days_count(start, today, holidays)
+            is_active = bool(row["is_active"] if row["is_active"] is not None else 1)
+            end_date = today
+            if not is_active:
+                try:
+                    end_date = date.fromisoformat((row["return_date"] or "").strip())
+                except ValueError:
+                    end_date = today
+
+            absence_days = business_days_count(start, end_date, holidays)
             danger_ratio = min(max(absence_days / 7.0, 0), 1)
             tracked.append({
                 "row": row,
@@ -1459,7 +1467,7 @@ def create_app() -> Flask:
                 "is_report_due": absence_days >= 7,
                 "is_home_visit_due": absence_days >= 2,
                 "danger_ratio": danger_ratio,
-                "is_active": bool(row["is_active"] if row["is_active"] is not None else 1),
+                "is_active": is_active,
             })
 
         return render_template(
@@ -1603,7 +1611,23 @@ def create_app() -> Flask:
     @app.route("/logs")
     def logs_list() -> str:
         q = request.args.get("q", "").strip()
+        page_raw = request.args.get("page", "1").strip()
+        page = int(page_raw) if page_raw.isdigit() and int(page_raw) > 0 else 1
+        page_size = 20
+        offset = (page - 1) * page_size
+
         if q:
+            count_row = query_db(
+                """
+                SELECT COUNT(*) AS cnt
+                FROM counsel_logs l
+                JOIN students s ON s.id = l.student_id
+                WHERE l.summary LIKE ? OR l.type LIKE ? OR s.name LIKE ? OR l.date LIKE ?
+                """,
+                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"),
+                one=True,
+            )
+            total_count = int(count_row["cnt"] or 0) if count_row else 0
             rows = query_db(
                 """
                 SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
@@ -1612,10 +1636,13 @@ def create_app() -> Flask:
                 JOIN students s ON s.id = l.student_id
                 WHERE l.summary LIKE ? OR l.type LIKE ? OR s.name LIKE ? OR l.date LIKE ?
                 ORDER BY l.date DESC, l.created_at DESC
+                LIMIT ? OFFSET ?
                 """,
-                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%"),
+                (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", page_size, offset),
             )
         else:
+            count_row = query_db("SELECT COUNT(*) AS cnt FROM counsel_logs", one=True)
+            total_count = int(count_row["cnt"] or 0) if count_row else 0
             rows = query_db(
                 """
                 SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
@@ -1623,9 +1650,50 @@ def create_app() -> Flask:
                 FROM counsel_logs l
                 JOIN students s ON s.id = l.student_id
                 ORDER BY l.date DESC, l.created_at DESC
-                """
+                LIMIT ? OFFSET ?
+                """,
+                (page_size, offset),
             )
-        return render_template("logs.html", logs=rows, q=q)
+
+        total_pages = max(1, (total_count + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        if (page - 1) * page_size != offset:
+            offset = (page - 1) * page_size
+            if q:
+                rows = query_db(
+                    """
+                    SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
+                           s.grade, s.class_no, s.class_name
+                    FROM counsel_logs l
+                    JOIN students s ON s.id = l.student_id
+                    WHERE l.summary LIKE ? OR l.type LIKE ? OR s.name LIKE ? OR l.date LIKE ?
+                    ORDER BY l.date DESC, l.created_at DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (f"%{q}%", f"%{q}%", f"%{q}%", f"%{q}%", page_size, offset),
+                )
+            else:
+                rows = query_db(
+                    """
+                    SELECT l.id, l.date, l.type, l.summary, s.id AS student_id, s.name AS student_name,
+                           s.grade, s.class_no, s.class_name
+                    FROM counsel_logs l
+                    JOIN students s ON s.id = l.student_id
+                    ORDER BY l.date DESC, l.created_at DESC
+                    LIMIT ? OFFSET ?
+                    """,
+                    (page_size, offset),
+                )
+
+        return render_template(
+            "logs.html",
+            logs=rows,
+            q=q,
+            page=page,
+            total_pages=total_pages,
+            total_count=total_count,
+            page_size=page_size,
+        )
 
     @app.route("/logs/new", methods=["GET", "POST"])
     def new_log() -> str:
@@ -2921,6 +2989,16 @@ def get_backup_passphrase() -> str:
         return env_passphrase
     if has_app_context():
         return get_app_setting("backup_passphrase", "").strip()
+
+    if DB_PATH.exists():
+        try:
+            conn = sqlite3.connect(DB_PATH)
+            row = conn.execute("SELECT value FROM app_settings WHERE key = 'backup_passphrase'").fetchone()
+            conn.close()
+            if row and row[0]:
+                return str(row[0]).strip()
+        except sqlite3.Error:
+            return ""
     return ""
 
 

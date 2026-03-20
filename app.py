@@ -127,11 +127,12 @@ def create_app() -> Flask:
             "static",
             "favicon",
         }
+        is_homeroom_endpoint = endpoint.startswith("homeroom_")
 
-        if not security_configured and endpoint not in {"security_setup", "static", "favicon"}:
+        if not security_configured and endpoint not in {"security_setup", "static", "favicon"} and not is_homeroom_endpoint:
             return redirect(url_for("security_setup"))
 
-        if security_configured and endpoint not in exempt_endpoints:
+        if security_configured and endpoint not in exempt_endpoints and not is_homeroom_endpoint:
             now_ts = int(datetime.now().timestamp())
             last_activity = int(session.get("last_activity", now_ts))
             is_unlocked = bool(session.get("is_unlocked", False))
@@ -608,6 +609,373 @@ def create_app() -> Flask:
                 return redirect(url_for("index"))
 
         return render_template("password_reset.html")
+
+    @app.route("/homeroom/login", methods=["GET", "POST"])
+    def homeroom_login() -> str:
+        if request.method == "POST":
+            teacher_name = request.form.get("teacher_name", "").strip()
+            password = request.form.get("password", "")
+            account = get_homeroom_account_by_name(teacher_name)
+
+            if account is None:
+                if password != HOMEROOM_INITIAL_PASSWORD:
+                    flash("담임교사 이름 또는 비밀번호가 올바르지 않습니다.")
+                    return redirect(url_for("homeroom_login"))
+                if not has_homeroom_students(teacher_name):
+                    flash("등록된 담임교사 이름이 아닙니다. 학생 정보의 담임선생님 이름을 확인해 주세요.")
+                    return redirect(url_for("homeroom_login"))
+                now_text = datetime.now().isoformat(timespec="seconds")
+                execute_db(
+                    """
+                    INSERT INTO homeroom_teacher_accounts(name, password_hash, must_change_password, created_at, updated_at)
+                    VALUES (?, ?, 1, ?, ?)
+                    """,
+                    (teacher_name, generate_password_hash(HOMEROOM_INITIAL_PASSWORD), now_text, now_text),
+                )
+                account = get_homeroom_account_by_name(teacher_name)
+
+            stored_hash = account["password_hash"] if account else ""
+            if not stored_hash or not check_password_hash(stored_hash, password):
+                flash("담임교사 이름 또는 비밀번호가 올바르지 않습니다.")
+                return redirect(url_for("homeroom_login"))
+
+            session["homeroom_teacher_name"] = teacher_name
+            session["homeroom_authenticated"] = True
+            session["homeroom_needs_password_change"] = bool(account["must_change_password"] if account else 1)
+            if session["homeroom_needs_password_change"]:
+                flash("초기 비밀번호로 접속했습니다. 바로 새 비밀번호로 변경해 주세요.")
+                return redirect(url_for("homeroom_change_password"))
+
+            flash(f"{teacher_name} 담임교사 페이지에 접속했습니다.")
+            return redirect(url_for("homeroom_dashboard"))
+
+        return render_template("homeroom_login.html")
+
+    @app.route("/homeroom/logout", methods=["POST"])
+    def homeroom_logout() -> str:
+        session.pop("homeroom_teacher_name", None)
+        session.pop("homeroom_authenticated", None)
+        session.pop("homeroom_needs_password_change", None)
+        flash("담임교사 페이지에서 로그아웃했습니다.")
+        return redirect(url_for("homeroom_login"))
+
+    @app.route("/homeroom/change-password", methods=["GET", "POST"])
+    def homeroom_change_password() -> str:
+        teacher_name = get_current_homeroom_teacher_name()
+        if not teacher_name:
+            return redirect(url_for("homeroom_login"))
+
+        account = get_homeroom_account_by_name(teacher_name)
+        if account is None:
+            flash("담임교사 계정을 찾지 못했습니다.")
+            return redirect(url_for("homeroom_login"))
+
+        if request.method == "POST":
+            current_password = request.form.get("current_password", "")
+            new_password = request.form.get("new_password", "")
+            new_password_confirm = request.form.get("new_password_confirm", "")
+
+            if not check_password_hash(account["password_hash"], current_password):
+                flash("현재 비밀번호가 올바르지 않습니다.")
+            elif len(new_password) < 4:
+                flash("새 비밀번호는 4자리 이상이어야 합니다.")
+            elif new_password != new_password_confirm:
+                flash("새 비밀번호 확인이 일치하지 않습니다.")
+            else:
+                execute_db(
+                    """
+                    UPDATE homeroom_teacher_accounts
+                    SET password_hash = ?, must_change_password = 0, updated_at = ?
+                    WHERE name = ?
+                    """,
+                    (generate_password_hash(new_password), datetime.now().isoformat(timespec="seconds"), teacher_name),
+                )
+                session["homeroom_needs_password_change"] = False
+                flash("담임교사 비밀번호를 변경했습니다.")
+                return redirect(url_for("homeroom_dashboard"))
+
+        return render_template("homeroom_change_password.html", teacher_name=teacher_name)
+
+    @app.route("/homeroom", methods=["GET", "POST"])
+    def homeroom_dashboard() -> str:
+        teacher_name = get_current_homeroom_teacher_name()
+        if not teacher_name:
+            return redirect(url_for("homeroom_login"))
+        if session.get("homeroom_needs_password_change"):
+            return redirect(url_for("homeroom_change_password"))
+
+        homeroom_students = query_db(
+            """
+            SELECT id, student_no, name, grade, class_no, class_name, guardian_phone
+            FROM students
+            WHERE homeroom_teacher = ?
+            ORDER BY grade, class_no, name
+            """,
+            (teacher_name,),
+        )
+
+        if request.method == "POST":
+            action = request.form.get("action", "").strip()
+            if action == "add_absence":
+                student_id = request.form.get("student_id", "").strip()
+                start_date = request.form.get("start_date", "").strip()
+                student_row = query_db(
+                    "SELECT id, name, grade, class_no, class_name FROM students WHERE id = ? AND homeroom_teacher = ?",
+                    (int(student_id), teacher_name),
+                    one=True,
+                ) if student_id.isdigit() else None
+                if student_row is None or not start_date:
+                    flash("자기 반 학생과 시작일을 확인해 주세요.")
+                else:
+                    execute_db(
+                        "INSERT INTO unexcused_absences(student_id, start_date, home_visit_done, created_at) VALUES (?, ?, 0, ?)",
+                        (int(student_id), start_date, datetime.now().isoformat(timespec="seconds")),
+                    )
+                    create_notification(
+                        "homeroom_absence",
+                        f"담임교사 {teacher_name}: 미인정결석 등록 - {student_row['name']}",
+                        url_for("absence_tracker"),
+                    )
+                    flash("미인정결석 학생을 등록했습니다.")
+                    return redirect(url_for("homeroom_dashboard"))
+            elif action == "mark_return":
+                absence_id = request.form.get("absence_id", "").strip()
+                row = query_db(
+                    """
+                    SELECT a.id, s.name AS student_name
+                    FROM unexcused_absences a
+                    JOIN students s ON s.id = a.student_id
+                    WHERE a.id = ? AND s.homeroom_teacher = ?
+                    """,
+                    (int(absence_id), teacher_name),
+                    one=True,
+                ) if absence_id.isdigit() else None
+                if row is None:
+                    flash("복귀 처리할 대상을 찾을 수 없습니다.")
+                else:
+                    execute_db(
+                        "UPDATE unexcused_absences SET is_active = 0, return_date = ? WHERE id = ?",
+                        (datetime.now().date().isoformat(), int(absence_id)),
+                    )
+                    create_notification(
+                        "homeroom_absence_return",
+                        f"담임교사 {teacher_name}: 복귀 처리 - {row['student_name']}",
+                        url_for("absence_tracker"),
+                    )
+                    flash("복귀 처리했습니다.")
+                    return redirect(url_for("homeroom_dashboard"))
+
+        today = datetime.now().date()
+        temp_holiday_rows = query_db("SELECT holiday_date, name FROM school_holidays")
+        years = {today.year, today.year - 1, today.year + 1}
+        for r in query_db(
+            """
+            SELECT a.start_date, a.return_date
+            FROM unexcused_absences a
+            JOIN students s ON s.id = a.student_id
+            WHERE s.homeroom_teacher = ?
+            """,
+            (teacher_name,),
+        ):
+            for key in ("start_date", "return_date"):
+                value = (r[key] or "").strip() if r[key] else ""
+                if value:
+                    try:
+                        years.add(date.fromisoformat(value).year)
+                    except ValueError:
+                        pass
+        auto_holidays = get_korean_public_holidays(years)
+        temp_holidays = {row["holiday_date"]: (row["name"] or "임시공휴일") for row in temp_holiday_rows}
+        holidays = set(auto_holidays.keys()) | set(temp_holidays.keys())
+        vacation_holidays = get_vacation_date_map(date(today.year - 1, 1, 1), date(today.year + 1, 12, 31))
+        holidays |= set(vacation_holidays.keys())
+        absence_rows = query_db(
+            """
+            SELECT a.id, a.student_id, a.start_date, a.home_visit_done, a.home_visit_done_at, a.is_active, a.return_date, a.created_at,
+                   s.student_no, s.name AS student_name, s.grade, s.class_no, s.class_name
+            FROM unexcused_absences a
+            JOIN students s ON s.id = a.student_id
+            WHERE s.homeroom_teacher = ?
+            ORDER BY a.is_active DESC, a.start_date ASC, a.id DESC
+            """,
+            (teacher_name,),
+        )
+        tracked = build_absence_tracked_rows(absence_rows, holidays, today)
+
+        referral_rows = query_db(
+            """
+            SELECT r.id, r.student_id, r.student_name_snapshot, r.created_at, r.parent_consent,
+                   s.grade, s.class_no, s.class_name
+            FROM homeroom_referrals r
+            LEFT JOIN students s ON s.id = r.student_id
+            WHERE r.teacher_name = ?
+            ORDER BY r.id DESC
+            LIMIT 20
+            """,
+            (teacher_name,),
+        )
+
+        return render_template(
+            "homeroom_dashboard.html",
+            teacher_name=teacher_name,
+            students=homeroom_students,
+            tracked=tracked,
+            today=today.isoformat(),
+            referral_rows=referral_rows,
+        )
+
+    @app.route("/homeroom/referrals/new", methods=["GET", "POST"])
+    def homeroom_referral_new() -> str:
+        teacher_name = get_current_homeroom_teacher_name()
+        if not teacher_name:
+            return redirect(url_for("homeroom_login"))
+        if session.get("homeroom_needs_password_change"):
+            return redirect(url_for("homeroom_change_password"))
+
+        students = query_db(
+            "SELECT id, student_no, name, grade, class_no, class_name, guardian_phone FROM students WHERE homeroom_teacher = ? ORDER BY grade, class_no, name",
+            (teacher_name,),
+        )
+
+        if request.method == "POST":
+            student_id_raw = request.form.get("student_id", "").strip()
+            student = query_db(
+                "SELECT id, student_no, name, grade, class_no, class_name, guardian_phone FROM students WHERE id = ? AND homeroom_teacher = ?",
+                (int(student_id_raw), teacher_name),
+                one=True,
+            ) if student_id_raw.isdigit() else None
+            if student is None:
+                flash("자기 반 학생을 선택해 주세요.")
+                return redirect(url_for("homeroom_referral_new"))
+
+            concern_flags = request.form.getlist("concern_flags")
+            family_types = request.form.getlist("family_types")
+            parent_consent = 1 if request.form.get("parent_consent") == "1" else 0
+            now_text = datetime.now().isoformat(timespec="seconds")
+            referral_id = execute_db(
+                """
+                INSERT INTO homeroom_referrals(
+                    teacher_name, student_id, student_name_snapshot, consult_time_first, consult_time_second, consult_time_other,
+                    parent_contact, birth_date, recent_grade_level, concern_flags, family_types,
+                    request_reason, behavior_traits, past_history, counseling_notes,
+                    parent_consent, parent_name, consent_date, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    teacher_name,
+                    int(student_id_raw),
+                    student["name"],
+                    request.form.get("consult_time_first", "").strip(),
+                    request.form.get("consult_time_second", "").strip(),
+                    request.form.get("consult_time_other", "").strip(),
+                    request.form.get("parent_contact", "").strip(),
+                    request.form.get("birth_date", "").strip(),
+                    request.form.get("recent_grade_level", "").strip(),
+                    ", ".join(concern_flags),
+                    ", ".join(family_types),
+                    request.form.get("request_reason", "").strip(),
+                    request.form.get("behavior_traits", "").strip(),
+                    request.form.get("past_history", "").strip(),
+                    request.form.get("counseling_notes", "").strip(),
+                    parent_consent,
+                    request.form.get("parent_name", "").strip(),
+                    request.form.get("consent_date", "").strip(),
+                    now_text,
+                    now_text,
+                ),
+            )
+
+            request_title = f"담임교사 상담의뢰 - {student['name']}"
+            request_content = (
+                f"의뢰 사유: {request.form.get('request_reason', '').strip()}\n"
+                f"행동특성: {request.form.get('behavior_traits', '').strip()}\n"
+                f"과거사항: {request.form.get('past_history', '').strip()}"
+            ).strip()
+            counselor_request_id = execute_db(
+                """
+                INSERT INTO incoming_counsel_requests(
+                    external_response_id, source, student_name, student_no, grade, class_no, phone,
+                    request_title, request_content, requested_date, requested_time,
+                    payload_json, source_ip, status, submitted_at, created_at, updated_at
+                )
+                VALUES (?, 'homeroom_teacher', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new', ?, ?, ?)
+                """,
+                (
+                    f"homeroom-referral-{referral_id}",
+                    student["name"],
+                    student["student_no"],
+                    student["grade"],
+                    student["class_no"],
+                    student["guardian_phone"],
+                    request_title,
+                    request_content,
+                    "",
+                    "",
+                    json.dumps({"referral_id": referral_id}, ensure_ascii=False),
+                    request.remote_addr or "",
+                    now_text,
+                    now_text,
+                    now_text,
+                ),
+            )
+            create_notification(
+                "homeroom_referral",
+                f"담임교사 {teacher_name}: 상담의뢰서 제출 - {student['name']}",
+                url_for("homeroom_referral_detail", referral_id=referral_id),
+                related_request_id=counselor_request_id,
+            )
+            flash("상담의뢰서를 제출했습니다. 상담교사에게 알림이 전송됩니다.")
+            return redirect(url_for("homeroom_dashboard"))
+
+        return render_template(
+            "homeroom_referral_form.html",
+            teacher_name=teacher_name,
+            students=students,
+            concern_options=HOMEROOM_REFERRAL_CONCERNS,
+            family_options=HOMEROOM_REFERRAL_FAMILY_TYPES,
+            today=datetime.now().date().isoformat(),
+        )
+
+    @app.route("/homeroom/referrals/<int:referral_id>")
+    def homeroom_referral_detail(referral_id: int) -> str:
+        teacher_name = get_current_homeroom_teacher_name()
+        counselor_unlocked = bool(session.get("is_unlocked", False))
+        if not teacher_name and not counselor_unlocked:
+            return redirect(url_for("homeroom_login"))
+
+        referral = query_db(
+            """
+            SELECT r.*, s.student_no, s.grade, s.class_no, s.class_name, s.guardian_phone
+            FROM homeroom_referrals r
+            LEFT JOIN students s ON s.id = r.student_id
+            WHERE r.id = ?
+            """,
+            (referral_id,),
+            one=True,
+        )
+        if referral is None:
+            flash("의뢰서를 찾을 수 없습니다.")
+            return redirect(url_for("homeroom_dashboard") if teacher_name else url_for("notifications_page"))
+        if teacher_name and referral["teacher_name"] != teacher_name and not counselor_unlocked:
+            flash("다른 담임교사의 의뢰서는 볼 수 없습니다.")
+            return redirect(url_for("homeroom_dashboard"))
+
+        request_row = query_db(
+            "SELECT id FROM incoming_counsel_requests WHERE external_response_id = ?",
+            (f"homeroom-referral-{referral_id}",),
+            one=True,
+        )
+        return render_template(
+            "homeroom_referral_detail.html",
+            base_template="base.html" if counselor_unlocked else "homeroom_base.html",
+            referral=referral,
+            concern_list=split_csv_text(referral["concern_flags"]),
+            family_list=split_csv_text(referral["family_types"]),
+            teacher_name=teacher_name,
+            counselor_unlocked=counselor_unlocked,
+            request_id=request_row["id"] if request_row else None,
+        )
 
 
     @app.route("/settings/lock", methods=["GET", "POST"])
@@ -1445,30 +1813,7 @@ def create_app() -> Flask:
             """
         )
 
-        tracked = []
-        for row in rows:
-            try:
-                start = date.fromisoformat(row["start_date"])
-            except ValueError:
-                continue
-            is_active = bool(row["is_active"] if row["is_active"] is not None else 1)
-            end_date = today
-            if not is_active:
-                try:
-                    end_date = date.fromisoformat((row["return_date"] or "").strip())
-                except ValueError:
-                    end_date = today
-
-            absence_days = business_days_count(start, end_date, holidays)
-            danger_ratio = min(max(absence_days / 7.0, 0), 1)
-            tracked.append({
-                "row": row,
-                "absence_days": absence_days,
-                "is_report_due": absence_days >= 7,
-                "is_home_visit_due": absence_days >= 2,
-                "danger_ratio": danger_ratio,
-                "is_active": is_active,
-            })
+        tracked = build_absence_tracked_rows(rows, holidays, today)
 
         return render_template(
             "absence_tracker.html",
@@ -2343,6 +2688,97 @@ def sync_followup_schedule_for_log(
     return "created"
 
 
+HOMEROOM_INITIAL_PASSWORD = "1234"
+HOMEROOM_REFERRAL_CONCERNS = [
+    "교우관계",
+    "가족갈등",
+    "대인관계",
+    "진로",
+    "과잉행동/주의력 결핍",
+    "사별경험",
+    "소극적 성격",
+    "불안/우울",
+    "충동/분노조절",
+    "품행/문제행동",
+    "목표부재",
+    "선택적 함구",
+    "음주/흡연",
+    "이성문제",
+    "주의산만",
+    "학업부진",
+    "무단/잦은 결석",
+    "인터넷/스마트폰 과의존",
+    "학습부적응",
+    "기타",
+]
+HOMEROOM_REFERRAL_FAMILY_TYPES = ["일반가정", "다문화", "한부모", "조손가정"]
+
+
+def split_csv_text(raw: str | None) -> list[str]:
+    if not raw:
+        return []
+    return [part.strip() for part in str(raw).split(",") if part.strip()]
+
+
+def create_notification(notification_type: str, message: str, link_url: str = "", related_request_id: int | None = None) -> int:
+    return execute_db(
+        """
+        INSERT INTO notifications(type, message, link_url, related_request_id, is_read, created_at)
+        VALUES (?, ?, ?, ?, 0, ?)
+        """,
+        (notification_type, message, link_url or None, related_request_id, datetime.now().isoformat(timespec="seconds")),
+    )
+
+
+def get_homeroom_account_by_name(name: str):
+    if not name:
+        return None
+    return query_db("SELECT name, password_hash, must_change_password FROM homeroom_teacher_accounts WHERE name = ?", (name,), one=True)
+
+
+def has_homeroom_students(name: str) -> bool:
+    if not name:
+        return False
+    row = query_db("SELECT COUNT(*) AS cnt FROM students WHERE homeroom_teacher = ?", (name,), one=True)
+    return bool(row and row["cnt"])
+
+
+def get_current_homeroom_teacher_name() -> str:
+    if not session.get("homeroom_authenticated"):
+        return ""
+    return str(session.get("homeroom_teacher_name", "")).strip()
+
+
+def build_absence_tracked_rows(rows, holidays: set[str], today: date) -> list[dict[str, Any]]:
+    tracked: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            start = date.fromisoformat(row["start_date"])
+        except ValueError:
+            continue
+        is_active = bool(row["is_active"] if row["is_active"] is not None else 1)
+        end_date = today
+        if not is_active:
+            try:
+                end_date = date.fromisoformat((row["return_date"] or "").strip())
+            except ValueError:
+                end_date = today
+
+        absence_days = business_days_count(start, end_date, holidays)
+        danger_ratio = min(max(absence_days / 7.0, 0), 1)
+        tracked.append(
+            {
+                "row": row,
+                "absence_days": absence_days,
+                "is_report_due": absence_days >= 7,
+                "is_home_visit_due": absence_days >= 2,
+                "danger_ratio": danger_ratio,
+                "is_active": is_active,
+            }
+        )
+    return tracked
+
+
 def init_db() -> None:
     conn = get_db()
     with conn:
@@ -2478,6 +2914,39 @@ def init_db() -> None:
                 related_request_id INTEGER,
                 is_read INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS homeroom_teacher_accounts (
+                name TEXT PRIMARY KEY,
+                password_hash TEXT NOT NULL,
+                must_change_password INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS homeroom_referrals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                teacher_name TEXT NOT NULL,
+                student_id INTEGER NOT NULL,
+                student_name_snapshot TEXT NOT NULL,
+                consult_time_first TEXT,
+                consult_time_second TEXT,
+                consult_time_other TEXT,
+                parent_contact TEXT,
+                birth_date TEXT,
+                recent_grade_level TEXT,
+                concern_flags TEXT,
+                family_types TEXT,
+                request_reason TEXT,
+                behavior_traits TEXT,
+                past_history TEXT,
+                counseling_notes TEXT,
+                parent_consent INTEGER NOT NULL DEFAULT 0,
+                parent_name TEXT,
+                consent_date TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY(student_id) REFERENCES students(id)
             );
 
             CREATE TABLE IF NOT EXISTS counsel_types (

@@ -1,0 +1,83 @@
+{% extends "homeroom_base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>위(Wee) 클래스 상담의뢰서 작성</h2>
+      <p class="muted">담임교사가 자기 반 학생에 대해 상담의뢰를 등록하면 상담교사 페이지에 알림이 전송됩니다.</p>
+    </div>
+  </div>
+  <form method="post" class="grid-form">
+    <label class="full">학생 선택
+      <select name="student_id" required>
+        <option value="">선택</option>
+        {% for s in students %}
+        <option value="{{ s.id }}">{{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>상담희망일시(1순위)
+      <input name="consult_time_first" placeholder="예: 3월 20일 3교시">
+    </label>
+    <label>상담희망일시(2순위)
+      <input name="consult_time_second" placeholder="예: 3월 21일 점심시간">
+    </label>
+    <label>기타 가능 시간
+      <input name="consult_time_other" placeholder="예: 방과후">
+    </label>
+    <label>학부모 연락처
+      <input name="parent_contact" placeholder="연락 가능한 번호">
+    </label>
+    <label>학생 생년월일
+      <input type="date" name="birth_date">
+    </label>
+    <label>최근 성적/학업수준
+      <input name="recent_grade_level" placeholder="예: 중 / 학업부진">
+    </label>
+    <label class="full">학생 개인의 특성(복수 선택 가능)</label>
+    <div class="full button-row" style="gap:.4rem; flex-wrap:wrap;">
+      {% for option in concern_options %}
+      <label class="muted" style="display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border:1px solid #dbe5f3;border-radius:999px;">
+        <input type="checkbox" name="concern_flags" value="{{ option }}"> {{ option }}
+      </label>
+      {% endfor %}
+    </div>
+    <label class="full">가족형태</label>
+    <div class="full button-row" style="gap:.4rem; flex-wrap:wrap;">
+      {% for option in family_options %}
+      <label class="muted" style="display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border:1px solid #dbe5f3;border-radius:999px;">
+        <input type="checkbox" name="family_types" value="{{ option }}"> {{ option }}
+      </label>
+      {% endfor %}
+    </div>
+    <label class="full">의뢰사유 및 행동특성
+      <textarea name="request_reason" rows="4" placeholder="상담 의뢰 이유를 구체적으로 입력하세요."></textarea>
+    </label>
+    <label class="full">행동특성 / 현재 관찰 내용
+      <textarea name="behavior_traits" rows="4" placeholder="교실, 교우관계, 수업 중 행동 등을 입력하세요."></textarea>
+    </label>
+    <label class="full">현재까지의 개입사항 / 과거 사항
+      <textarea name="past_history" rows="4" placeholder="학부모 상담, 교내 지도, 과거 병력/상담 이력 등을 입력하세요."></textarea>
+    </label>
+    <label class="full">상담 시 참고사항
+      <textarea name="counseling_notes" rows="4" placeholder="상담교사가 알아야 할 참고사항"></textarea>
+    </label>
+    <label>학부모 동의 여부
+      <select name="parent_consent">
+        <option value="1">동의</option>
+        <option value="0">미동의</option>
+      </select>
+    </label>
+    <label>학부모 성명
+      <input name="parent_name" placeholder="예: 홍길동">
+    </label>
+    <label>동의일
+      <input type="date" name="consent_date" value="{{ today }}">
+    </label>
+    <div class="button-row full">
+      <button class="btn" type="submit">상담의뢰서 제출</button>
+      <a class="btn btn-secondary" href="{{ url_for('homeroom_dashboard') }}">돌아가기</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

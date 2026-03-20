@@ -1,0 +1,77 @@
+{% extends "homeroom_base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>내 반 미인정결석 등록</h2>
+      <p class="muted">담임으로 등록된 학생만 선택할 수 있습니다.</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('homeroom_referral_new') }}">상담의뢰서 작성</a>
+  </div>
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="add_absence">
+    <label class="full">학생
+      <select name="student_id" required>
+        <option value="">선택</option>
+        {% for s in students %}
+        <option value="{{ s.id }}">{{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>시작일
+      <input type="date" name="start_date" value="{{ today }}" required>
+    </label>
+    <button class="btn" type="submit">미인정결석 등록</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>내 반 미인정결석 현황</h2>
+  <table>
+    <thead><tr><th>학생</th><th>시작일</th><th>결석일수</th><th>상태</th><th>복귀처리</th></tr></thead>
+    <tbody>
+      {% for item in tracked %}
+      <tr>
+        <td>{{ item.row.grade or '-' }}학년 {{ item.row.class_no or item.row.class_name or '-' }}반 {{ item.row.student_name }}</td>
+        <td>{{ item.row.start_date }}</td>
+        <td>{{ item.absence_days }}일</td>
+        <td>{% if item.is_active %}진행중{% else %}복귀완료 ({{ item.row.return_date or '-' }}){% endif %}</td>
+        <td>
+          {% if item.is_active %}
+          <form method="post" style="display:inline;">
+            <input type="hidden" name="action" value="mark_return">
+            <input type="hidden" name="absence_id" value="{{ item.row.id }}">
+            <button class="btn btn-secondary" type="submit">복귀처리</button>
+          </form>
+          {% else %}
+          <span class="muted">-</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">등록된 미인정결석 학생이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>최근 제출한 상담의뢰서</h2>
+  <table>
+    <thead><tr><th>작성일</th><th>학생</th><th>학년/반</th><th>보호자 동의</th><th>열기</th></tr></thead>
+    <tbody>
+      {% for row in referral_rows %}
+      <tr>
+        <td>{{ (row.created_at or '')[:10] }}</td>
+        <td>{{ row.student_name_snapshot }}</td>
+        <td>{{ row.grade or '-' }}학년 {{ row.class_no or row.class_name or '-' }}반</td>
+        <td>{{ '예' if row.parent_consent else '아니오' }}</td>
+        <td><a class="btn btn-secondary" href="{{ url_for('homeroom_referral_detail', referral_id=row.id) }}">보기</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">제출한 상담의뢰서가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

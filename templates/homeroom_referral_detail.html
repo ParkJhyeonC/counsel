@@ -1,0 +1,37 @@
+{% extends base_template %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>위(Wee) 클래스 상담의뢰서</h2>
+      <p class="muted">담임교사: {{ referral.teacher_name }} | 학생: {{ referral.student_name_snapshot }}</p>
+    </div>
+    <div class="button-row">
+      {% if counselor_unlocked and request_id %}
+      <a class="btn" href="{{ url_for('schedule', request_id=request_id) }}">상담 일정 등록으로 이동</a>
+      {% endif %}
+      {% if not counselor_unlocked %}
+      <a class="btn btn-secondary" href="{{ url_for('homeroom_dashboard') }}">담임교사 페이지로</a>
+      {% endif %}
+    </div>
+  </div>
+
+  <table>
+    <tbody>
+      <tr><th>학생</th><td>{{ referral.grade or '-' }}학년 {{ referral.class_no or referral.class_name or '-' }}반 {{ referral.student_name_snapshot }}</td></tr>
+      <tr><th>학부모 연락처</th><td>{{ referral.parent_contact or referral.guardian_phone or '-' }}</td></tr>
+      <tr><th>생년월일</th><td>{{ referral.birth_date or '-' }}</td></tr>
+      <tr><th>상담희망일시</th><td>1순위: {{ referral.consult_time_first or '-' }} / 2순위: {{ referral.consult_time_second or '-' }} / 기타: {{ referral.consult_time_other or '-' }}</td></tr>
+      <tr><th>최근 성적/학업수준</th><td>{{ referral.recent_grade_level or '-' }}</td></tr>
+      <tr><th>학생 특성</th><td>{{ concern_list | join(', ') if concern_list else '-' }}</td></tr>
+      <tr><th>가족형태</th><td>{{ family_list | join(', ') if family_list else '-' }}</td></tr>
+      <tr><th>의뢰사유</th><td style="white-space:pre-wrap;">{{ referral.request_reason or '-' }}</td></tr>
+      <tr><th>행동특성</th><td style="white-space:pre-wrap;">{{ referral.behavior_traits or '-' }}</td></tr>
+      <tr><th>과거사항</th><td style="white-space:pre-wrap;">{{ referral.past_history or '-' }}</td></tr>
+      <tr><th>상담 참고사항</th><td style="white-space:pre-wrap;">{{ referral.counseling_notes or '-' }}</td></tr>
+      <tr><th>학부모 동의</th><td>{{ '동의' if referral.parent_consent else '미동의' }} / {{ referral.parent_name or '-' }} / {{ referral.consent_date or '-' }}</td></tr>
+      <tr><th>제출일</th><td>{{ referral.created_at or '-' }}</td></tr>
+    </tbody>
+  </table>
+</section>
+{% endblock %}

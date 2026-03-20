@@ -27,9 +27,14 @@
         <div class="button-row">
           <button class="btn" type="submit">잠금 해제</button>
           <a class="btn btn-secondary" href="{{ url_for('password_reset') }}">암호 재설정</a>
-          <a class="btn btn-secondary" href="{{ url_for('homeroom_login') }}">담임교사 페이지</a>
         </div>
       </form>
+      <div class="lock-screen-actions">
+        <a class="btn btn-secondary btn-large lock-screen-homeroom-btn" href="{{ url_for('homeroom_login') }}">
+          👩‍🏫 담임교사 페이지로 이동
+        </a>
+        <p class="muted">담임교사는 여기서 바로 담임교사 로그인 화면으로 이동할 수 있습니다.</p>
+      </div>
     </section>
   </main>
 </body>

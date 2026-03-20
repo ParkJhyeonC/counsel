@@ -164,6 +164,27 @@ h2 { margin: 0 0 .6rem; font-size: 1.15rem; }
 }
 .btn:hover { filter: brightness(.95); }
 .button-row { display: flex; gap: .7rem; flex-wrap: wrap; align-items: center; }
+.btn-large {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: .95rem 1.1rem;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.lock-screen-actions {
+  margin-top: 1rem;
+  display: grid;
+  gap: .65rem;
+}
+.lock-screen-actions .muted {
+  margin: 0;
+  text-align: center;
+}
+.lock-screen-homeroom-btn {
+  box-shadow: 0 10px 24px rgba(30, 64, 175, .12);
+}
 
 .page-intro {
   display: flex;

@@ -5,6 +5,7 @@ import re
 import sqlite3
 import uuid
 import zipfile
+import ipaddress
 import sys
 import csv
 import hashlib
@@ -184,6 +185,35 @@ def get_launch_url() -> str:
     return get_public_base_url()
 
 
+def is_loopback_client(raw_address: str) -> bool:
+    candidate = (raw_address or "").strip()
+    if not candidate:
+        return False
+
+    if candidate.lower() == "localhost":
+        return True
+
+    zone_sep = candidate.find("%")
+    if zone_sep != -1:
+        candidate = candidate[:zone_sep]
+
+    try:
+        return ipaddress.ip_address(candidate).is_loopback
+    except ValueError:
+        return False
+
+
+def get_request_client_address() -> str:
+    forwarded_for = request.headers.get("X-Forwarded-For", "").split(",", 1)[0].strip()
+    if forwarded_for:
+        return forwarded_for
+    return (request.remote_addr or "").strip()
+
+
+def is_remote_client_request() -> bool:
+    return not is_loopback_client(get_request_client_address())
+
+
 def create_app() -> Flask:
     validate_project_layout()
 
@@ -204,6 +234,7 @@ def create_app() -> Flask:
         g.db = get_db()
         security_configured = is_security_configured()
         g.security_configured = security_configured
+        g.remote_client_request = is_remote_client_request()
 
         endpoint = request.endpoint or ""
         exempt_endpoints = {
@@ -222,12 +253,19 @@ def create_app() -> Flask:
 
         if security_configured and endpoint not in exempt_endpoints and not is_homeroom_endpoint:
             now_ts = int(datetime.now().timestamp())
+            client_address = get_request_client_address()
             last_activity = int(session.get("last_activity", now_ts))
             is_unlocked = bool(session.get("is_unlocked", False))
+
+            if g.remote_client_request and session.get("remote_unlock_verified_for") != client_address:
+                session["is_unlocked"] = False
+                session["last_activity"] = now_ts
+                return redirect(url_for("unlock_screen"))
 
             lock_timeout_seconds = get_lock_timeout_seconds()
             if is_unlocked and now_ts - last_activity > lock_timeout_seconds:
                 session["is_unlocked"] = False
+                session.pop("remote_unlock_verified_for", None)
                 flash(f"{lock_timeout_seconds // 60}분 이상 활동이 없어 화면이 잠겼습니다.")
                 return redirect(url_for("unlock_screen"))
 
@@ -639,6 +677,10 @@ def create_app() -> Flask:
                 set_app_setting("screen_lock_reset_phone", reset_phone)
                 session["is_unlocked"] = True
                 session["last_activity"] = int(datetime.now().timestamp())
+                if is_remote_client_request():
+                    session["remote_unlock_verified_for"] = get_request_client_address()
+                else:
+                    session.pop("remote_unlock_verified_for", None)
                 flash("보안 설정이 완료되었습니다.")
                 return redirect(url_for("index"))
 
@@ -663,6 +705,10 @@ def create_app() -> Flask:
 
         session["is_unlocked"] = True
         session["last_activity"] = int(datetime.now().timestamp())
+        if is_remote_client_request():
+            session["remote_unlock_verified_for"] = get_request_client_address()
+        else:
+            session.pop("remote_unlock_verified_for", None)
         flash("잠금이 해제되었습니다.")
         return redirect(url_for("index"))
 
@@ -670,6 +716,7 @@ def create_app() -> Flask:
     def lock_now() -> str:
         session["is_unlocked"] = False
         session["last_activity"] = int(datetime.now().timestamp())
+        session.pop("remote_unlock_verified_for", None)
         flash("화면을 잠갔습니다.")
         return redirect(url_for("unlock_screen"))
 
@@ -693,6 +740,10 @@ def create_app() -> Flask:
                 set_app_setting("screen_lock_password_hash", generate_password_hash(password))
                 session["is_unlocked"] = True
                 session["last_activity"] = int(datetime.now().timestamp())
+                if is_remote_client_request():
+                    session["remote_unlock_verified_for"] = get_request_client_address()
+                else:
+                    session.pop("remote_unlock_verified_for", None)
                 flash("암호를 재설정했습니다.")
                 return redirect(url_for("index"))
 

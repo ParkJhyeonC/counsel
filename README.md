@@ -53,17 +53,21 @@ scripts\run_tray.bat
 1. 가상환경 생성 (`.venv`)
 2. 의존성 설치
 3. DB 초기화 확인
-4. 서버 실행 (`http://localhost:5000`)
-5. (Windows `run.bat`) 기본 브라우저 자동 열기
+4. 서버 실행 (기본값 `http://localhost:5000`)
+5. (Windows `run.bat`) 저장된 접속 주소로 기본 브라우저 자동 열기
 
 `run_tray.bat`은 콘솔창 대신 트레이 아이콘으로 실행되며, 아이콘 우클릭으로 브라우저 열기/종료를 선택할 수 있습니다.
 트레이 실행 중 서버가 중간 종료되면 `data/run_tray.log`에 원인이 기록됩니다.
+
+`설정 > 학교 설정 > 접속 주소`에 `counselog.local` 같은 값을 저장하면 다음 실행부터 자동 열기/트레이 열기 주소도 그 값으로 바뀝니다.
+- `counselog.local`처럼 호스트명만 저장하면 현재 포트(기본 `5000`)가 자동으로 붙습니다.
+- 실제 접속이 되려면 해당 이름이 이 PC를 가리키도록 OS hosts 파일이나 내부 DNS를 따로 설정해야 합니다.
 
 ---
 
 ## Google Form 연동 (Pull 방식)
 
-`localhost` 환경에서는 Pull 방식으로 Google Form 응답을 가져와 상담신청 알림을 만들 수 있습니다.
+로컬 실행/내부망 환경에서는 Pull 방식으로 Google Form 응답을 가져와 상담신청 알림을 만들 수 있습니다.
 
 1. Google Form 응답이 쌓이는 Google Sheets를 열고 `파일 > 공유 > 웹에 게시`에서 CSV 링크를 생성합니다.
 2. 앱 `설정 > 학교 설정`의 **Google Form 연동(Pull)** 영역에 CSV URL을 저장합니다.
@@ -170,6 +174,8 @@ scripts\build_setup_windows.bat
 설치본 `counselog.exe` 실행 시에는 기본적으로 브라우저가 자동으로 `http://localhost:5000`을 엽니다.
 - 자동 열기를 끄려면: `COUNSELOG_OPEN_BROWSER=0`
 - 시작 URL을 바꾸려면: `COUNSELOG_START_URL=http://localhost:5000`
+- 접속 주소를 앱에 저장해 두려면: `설정 > 학교 설정 > 접속 주소`
+- 환경변수 `COUNSELOG_PUBLIC_URL=http://counselog.local:5000`를 사용해 기본 접속 주소를 강제로 지정할 수도 있습니다.
 
 ---
 

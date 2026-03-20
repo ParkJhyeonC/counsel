@@ -22,8 +22,8 @@ python -m pip install --upgrade pip
 python -m pip install -r "$ROOT_DIR/requirements.txt"
 
 export FLASK_APP=app.py
-export FLASK_RUN_HOST=0.0.0.0
-export FLASK_RUN_PORT=5000
+export FLASK_RUN_HOST="${FLASK_RUN_HOST:-0.0.0.0}"
+export FLASK_RUN_PORT="${FLASK_RUN_PORT:-5000}"
 
 cd "$ROOT_DIR"
 python -c "from app import init_db; init_db(); print('[INFO] DB 초기화 확인 완료')"

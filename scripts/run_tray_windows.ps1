@@ -20,6 +20,11 @@ if (-not (Test-Path (Split-Path $logPath))) {
 $startInfo.RedirectStandardOutput = $true
 $startInfo.RedirectStandardError = $true
 
+$launchUrl = & $PythonExe -c "from app import get_launch_url; print(get_launch_url())" 2>$null
+if (-not $launchUrl) {
+  $launchUrl = 'http://localhost:5000'
+}
+
 $serverProcess = New-Object System.Diagnostics.Process
 $serverProcess.StartInfo = $startInfo
 $null = $serverProcess.Start()
@@ -65,7 +70,7 @@ $serverProcess.add_ErrorDataReceived({
 
 $contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
 $openItem = $contextMenu.Items.Add('브라우저 열기')
-$openItem.Add_Click({ Start-Process 'http://localhost:5000' }) | Out-Null
+$openItem.Add_Click({ Start-Process $launchUrl }) | Out-Null
 $exitItem = $contextMenu.Items.Add('종료')
 $exitItem.Add_Click({
     if (-not $serverProcess.HasExited) {
@@ -77,7 +82,7 @@ $exitItem.Add_Click({
 }) | Out-Null
 
 $notifyIcon.ContextMenuStrip = $contextMenu
-$notifyIcon.Add_DoubleClick({ Start-Process 'http://localhost:5000' })
+$notifyIcon.Add_DoubleClick({ Start-Process $launchUrl })
 
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 2000

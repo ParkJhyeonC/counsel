@@ -35,9 +35,11 @@ call "%VENV_DIR%\Scripts\activate.bat" || goto :error
 python -m pip install --upgrade pip || goto :error
 python -m pip install -r requirements.txt || goto :error
 python -c "from app import init_db; init_db(); print('[INFO] DB initialization OK')" || goto :error
+for /f "usebackq delims=" %%I in (`python -c "from app import get_launch_url; print(get_launch_url())"`) do set "START_URL=%%I"
+if not defined START_URL set "START_URL=http://localhost:5000"
 
-echo [INFO] Starting app: http://localhost:5000
-start "" http://localhost:5000
+echo [INFO] Starting app: %START_URL%
+start "" "%START_URL%"
 python app.py
 echo [INFO] 전문상담교사 박재현 제공
 exit /b %errorlevel%

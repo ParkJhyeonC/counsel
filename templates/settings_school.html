@@ -11,6 +11,13 @@
     <label class="full">전문상담교사
       <input name="counselor_name" value="{{ counselor_name }}" placeholder="예: 홍길동" required>
     </label>
+    <label class="full">접속 주소(도메인처럼 보이게)
+      <input name="public_base_url" value="{{ public_base_url }}" placeholder="예: counselog.local 또는 https://counsel.yourschool.kr">
+    </label>
+    <p class="full muted" style="margin-top:-.35rem;">
+      브라우저 자동 열기와 실행 안내에 사용할 주소입니다. <code>counselog.local</code>처럼 호스트명만 넣으면 현재 포트(기본 5000)가 자동으로 붙습니다.
+      실제 접속이 되려면 hosts/DNS에서 해당 이름이 이 PC를 가리키도록 설정해야 합니다. 현재 적용 주소: <code>{{ resolved_launch_url }}</code>
+    </p>
     <button class="btn" type="submit">설정 저장</button>
     <hr style="border:none;border-top:1px solid #e5e7eb;margin:.6rem 0;">
   <h3 style="margin:.8rem 0 .35rem;">Google Form 연동(Pull)</h3>

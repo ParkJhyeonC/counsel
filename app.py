@@ -17,6 +17,7 @@ import shutil
 import tempfile
 from urllib import error as url_error
 from urllib import request as url_request
+from urllib.parse import urlsplit, urlunsplit
 import json
 from io import BytesIO
 from importlib import import_module, util as importlib_util
@@ -69,6 +70,9 @@ DATA_DIR = get_runtime_data_dir()
 DB_PATH = DATA_DIR / "counsel.db"
 UPLOAD_DIR = DATA_DIR / "uploads"
 BACKUP_DIR = DATA_DIR / "backups"
+DEFAULT_SERVER_HOST = "0.0.0.0"
+DEFAULT_SERVER_PORT = 5000
+DEFAULT_BROWSER_HOST = "localhost"
 MAX_BACKUP_FILES = 10
 LOCK_TIMEOUT_SECONDS = 30 * 60
 CASE_CONCEPT_THEORIES: list[dict[str, str]] = [
@@ -94,6 +98,90 @@ def validate_project_layout() -> None:
             "프로젝트 폴더 구조를 찾을 수 없습니다. templates/static 파일이 같은 프로젝트 루트에 있어야 합니다. "
             f"누락 파일: {missing}"
         )
+
+
+def get_server_port() -> int:
+    for key in ("COUNSELOG_PORT", "FLASK_RUN_PORT"):
+        raw_value = os.environ.get(key, "").strip()
+        if not raw_value:
+            continue
+        try:
+            port = int(raw_value)
+        except ValueError:
+            continue
+        if 1 <= port <= 65535:
+            return port
+    return DEFAULT_SERVER_PORT
+
+
+def get_server_host() -> str:
+    return os.environ.get("COUNSELOG_BIND_HOST", "").strip() or os.environ.get("FLASK_RUN_HOST", "").strip() or DEFAULT_SERVER_HOST
+
+
+def read_app_setting_value(key: str, default: str = "") -> str:
+    if has_app_context():
+        return get_app_setting(key, default)
+
+    if not DB_PATH.exists():
+        return default
+
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute("SELECT value FROM app_settings WHERE key = ?", (key,)).fetchone()
+    except sqlite3.OperationalError:
+        return default
+    finally:
+        conn.close()
+
+    if row and row["value"] is not None:
+        return str(row["value"])
+    return default
+
+
+def normalize_access_url(raw_value: str, *, default_host: str | None = None, default_port: int | None = None) -> str:
+    cleaned = (raw_value or "").strip()
+    default_host = (default_host or DEFAULT_BROWSER_HOST).strip() or DEFAULT_BROWSER_HOST
+    default_port = default_port or get_server_port()
+    if not cleaned:
+        return f"http://{default_host}:{default_port}"
+
+    if "://" not in cleaned:
+        cleaned = f"http://{cleaned}"
+
+    parsed = urlsplit(cleaned)
+    scheme = parsed.scheme or "http"
+    netloc = parsed.netloc or parsed.path
+    path = parsed.path if parsed.netloc else ""
+
+    if not netloc:
+        netloc = default_host
+
+    host_port = netloc.rsplit("@", 1)[-1]
+    if ":" not in host_port and scheme == "http" and default_port not in {80, 443}:
+        netloc = f"{netloc}:{default_port}"
+
+    normalized_path = path.rstrip("/") if path and path != "/" else ""
+    return urlunsplit((scheme, netloc, normalized_path, parsed.query, parsed.fragment))
+
+
+def get_public_base_url() -> str:
+    configured = os.environ.get("COUNSELOG_PUBLIC_URL", "").strip()
+    if configured:
+        return normalize_access_url(configured)
+
+    configured = read_app_setting_value("public_base_url", "").strip()
+    if configured:
+        return normalize_access_url(configured)
+
+    return normalize_access_url("", default_host=DEFAULT_BROWSER_HOST)
+
+
+def get_launch_url() -> str:
+    override = os.environ.get("COUNSELOG_START_URL", "").strip()
+    if override:
+        return normalize_access_url(override)
+    return get_public_base_url()
 
 
 def create_app() -> Flask:
@@ -1023,12 +1111,17 @@ def create_app() -> Flask:
         if request.method == "POST":
             school_name = request.form.get("school_name", "").strip()
             counselor_name = request.form.get("counselor_name", "").strip()
+            public_base_url = request.form.get("public_base_url", "").strip()
             pull_csv_url = request.form.get("google_form_pull_csv_url", "").strip()
             pull_auto_sync_enabled = "1" if request.form.get("google_form_pull_auto_sync_enabled") == "1" else "0"
             pull_interval_text = request.form.get("google_form_pull_interval_minutes", "").strip()
             if not pull_interval_text.isdigit():
                 pull_interval_text = "10"
             pull_interval_minutes = str(max(1, min(1440, int(pull_interval_text))))
+
+            normalized_public_base_url = ""
+            if public_base_url:
+                normalized_public_base_url = normalize_access_url(public_base_url)
 
             execute_db(
                 """
@@ -1052,6 +1145,14 @@ def create_app() -> Flask:
                 VALUES (?, ?)
                 ON CONFLICT(key) DO UPDATE SET value = excluded.value
                 """,
+                ("public_base_url", normalized_public_base_url),
+            )
+            execute_db(
+                """
+                INSERT INTO app_settings(key, value)
+                VALUES (?, ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
                 ("google_form_pull_csv_url", pull_csv_url),
             )
             set_app_setting("google_form_pull_auto_sync_enabled", pull_auto_sync_enabled)
@@ -1061,6 +1162,7 @@ def create_app() -> Flask:
 
         school_name = get_app_setting("school_name", "정동고등학교")
         counselor_name = get_app_setting("counselor_name", "전문상담교사")
+        public_base_url = get_app_setting("public_base_url", "")
         pull_csv_url = get_app_setting("google_form_pull_csv_url", "")
         pull_auto_sync_enabled = get_app_setting("google_form_pull_auto_sync_enabled", "0") == "1"
         pull_interval_minutes = get_app_setting("google_form_pull_interval_minutes", "10")
@@ -1069,6 +1171,8 @@ def create_app() -> Flask:
             "settings_school.html",
             school_name=school_name,
             counselor_name=counselor_name,
+            public_base_url=public_base_url,
+            resolved_launch_url=get_launch_url(),
             pull_csv_url=pull_csv_url,
             pull_auto_sync_enabled=pull_auto_sync_enabled,
             pull_interval_minutes=pull_interval_minutes,
@@ -4172,10 +4276,10 @@ if __name__ == "__main__":
         print(f"[INFO] 자동 백업 생성: {auto_backup}")
 
     open_browser_enabled = os.environ.get("COUNSELOG_OPEN_BROWSER", "1").strip().lower() not in {"0", "false", "no"}
-    start_url = os.environ.get("COUNSELOG_START_URL", "http://localhost:5000").strip() or "http://localhost:5000"
+    start_url = get_launch_url()
     if open_browser_enabled:
         threading.Timer(1.2, lambda: webbrowser.open(start_url)).start()
 
     is_frozen = bool(getattr(sys, "frozen", False))
     debug_mode = os.environ.get("FLASK_DEBUG", "0" if is_frozen else "1").strip() == "1"
-    app.run(host="0.0.0.0", port=5000, debug=debug_mode, use_reloader=(debug_mode and not is_frozen))
+    app.run(host=get_server_host(), port=get_server_port(), debug=debug_mode, use_reloader=(debug_mode and not is_frozen))

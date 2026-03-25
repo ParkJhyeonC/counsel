@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="kpi-grid">
+  <article class="card kpi-card">
+    <p class="kpi-label">전체 상담 건수</p>
+    <p class="kpi-value">{{ total_count }}</p>
+  </article>
+  <article class="card kpi-card">
+    <p class="kpi-label">{{ selected_year }}년 상담 건수</p>
+    <p class="kpi-value">{{ selected_year_count }}</p>
+  </article>
+</section>
+
+<section class="card">
+  <h2>월간 상담 통계</h2>
+  <form method="get" class="search-form">
+    <label>연도 <input type="number" min="2000" max="2100" name="year" value="{{ selected_year }}"></label>
+    <label>월
+      <select name="month">
+        <option value="">선택</option>
+        {% for m in range(1, 13) %}
+        <option value="{{ '%02d'|format(m) }}" {% if request.args.get('month', '') == ('%02d'|format(m)) %}selected{% endif %}>{{ m }}월</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn" type="submit">조회</button>
+    <button class="btn" type="button" id="neis-export-btn">월간통계(나이스 업로드) 엑셀 다운로드</button>
+    <a class="btn btn-secondary" href="{{ url_for('stats_annual_ledger', year=selected_year) }}" target="_blank">개인상담 운영대장 출력</a>
+  </form>
+  <p class="muted" style="margin-top:.35rem;">
+    나이스 업로드용 상담구분은 자동 보정됩니다: 학부모상담(학생관련상담/교사관련상담/학습관련상담/기타), 집단상담(학업/진로/학교폭력/성격/대인관계).
+  </p>
+
+  <form method="post" action="{{ url_for('stats_neis_monthly_import') }}" enctype="multipart/form-data" class="search-form" style="margin-top:.6rem;">
+    <input type="hidden" name="year" value="{{ selected_year }}">
+    <label class="full">월간통계(나이스 업로드) 엑셀 불러오기 (.xlsx)
+      <input type="file" name="neis_excel" accept=".xlsx" required>
+    </label>
+    <button class="btn btn-secondary" type="submit">엑셀 불러와 상담일지 저장</button>
+  </form>
+  <p class="muted" style="margin-top:.25rem;">내보내기와 동일한 헤더 양식(.xlsx) 파일을 업로드하면 상담일지를 일괄 등록합니다. 불러온 데이터는 <strong>학생관리 &gt; 나이스 불러오기(NEIS_IMPORT)</strong> 학생으로 저장됩니다.</p>
+
+  <div class="stats-bars">
+    {% set max_count = (monthly_stats | map(attribute='count') | max) if monthly_stats else 0 %}
+    {% for item in monthly_stats %}
+    <div class="stats-row">
+      <span class="stats-label">{{ item.month }}</span>
+      <div class="stats-track">
+        <div class="stats-fill" style="width: {{ (item.count / max_count * 100) if max_count > 0 else 0 }}%"></div>
+      </div>
+      <span class="stats-value">{{ item.count }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>{{ selected_year }}년 상담유형별 통계</h2>
+  <table>
+    <thead><tr><th>상담유형</th><th>건수</th><th>비율</th></tr></thead>
+    <tbody>
+      {% for row in type_stats %}
+      <tr>
+        <td>{{ row.type or '미분류' }}</td>
+        <td>{{ row.count }}</td>
+        <td>{{ '%.1f'|format((row.count / selected_year_count * 100) if selected_year_count > 0 else 0) }}%</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="3">해당 연도 상담유형 데이터가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>년간 상담 통계</h2>
+  <table>
+    <thead><tr><th>연도</th><th>상담 건수</th></tr></thead>
+    <tbody>
+      {% for row in yearly_stats %}
+      <tr><td>{{ row.year }}</td><td>{{ row.count }}</td></tr>
+      {% else %}
+      <tr><td colspan="2">상담 통계 데이터가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+<script>
+  const neisBtn = document.getElementById('neis-export-btn');
+  const yearInput = document.querySelector('input[name="year"]');
+  const monthSelect = document.querySelector('select[name="month"]');
+  neisBtn?.addEventListener('click', () => {
+    const year = (yearInput?.value || '').trim();
+    const month = (monthSelect?.value || '').trim();
+    if (!month) {
+      alert('월을 먼저 선택해 주세요.');
+      monthSelect?.focus();
+      return;
+    }
+    const url = new URL('{{ url_for("stats_neis_monthly_export") }}', window.location.origin);
+    if (year) url.searchParams.set('year', year);
+    url.searchParams.set('month', month);
+    window.location.href = url.toString();
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>시간/교시 설정</h2>
+  <p class="muted">상담 일정 등록 화면의 시간/교시 선택 항목을 설정합니다. 한 줄에 하나씩 입력하세요.</p>
+
+  <form method="post" class="grid-form">
+    <label class="full">시간/교시 목록
+      <textarea name="schedule_slots" rows="10" placeholder="예: 1교시
+2교시
+점심시간
+방과후" required>{{ schedule_slots_text }}</textarea>
+    </label>
+    <button class="btn" type="submit">저장</button>
+  </form>
+
+  <p class="muted">기본값: {{ default_schedule_slots | join(', ') }}</p>
+</section>
+{% endblock %}

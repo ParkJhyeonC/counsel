@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ app_title }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('favicon') }}">
+</head>
+<body>
+  <header class="app-header">
+    <div class="header-inner">
+      <div class="brand-block">
+        {% if header_logo_filename %}
+        <a class="brand-logo-link" href="{{ url_for('index') }}" title="{{ app_title }}">
+          <img class="brand-logo-image" src="{{ url_for('static', filename=header_logo_filename) }}" alt="{{ app_title }} 로고">
+        </a>
+        {% endif %}
+        <h1 class="logo"><a href="{{ url_for('index') }}">{{ app_title }}</a></h1>
+        {% if vacation_dday_text %}<span class="vacation-dday" title="파이팅!!">{{ vacation_dday_text }}</span>{% endif %}
+      </div>
+      <nav class="top-nav">
+        <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="{{ url_for('index') }}">홈</a>
+        <a class="nav-link {% if request.path.startswith('/students') %}active{% endif %}" href="{{ url_for('students') }}">학생관리</a>
+        <a class="nav-link {% if request.path.startswith('/schedule') %}active{% endif %}" href="{{ url_for('schedule') }}">상담 일정</a>
+        <a class="nav-link {% if request.path.startswith('/logs') and not request.path.startswith('/logs/new') %}active{% endif %}" href="{{ url_for('logs_list') }}">상담일지 확인</a>
+        <a class="nav-link {% if request.path.startswith('/absence') %}active{% endif %}" href="{{ url_for('absence_tracker') }}">미인정결석 관리</a>
+        <a class="nav-link {% if request.path.startswith('/stats') %}active{% endif %}" href="{{ url_for('stats') }}">상담 통계</a>
+        <a class="nav-link {% if request.path == '/settings' or request.path.startswith('/settings/') %}active{% endif %}" href="{{ url_for('school_settings') }}">설정</a>
+        <a class="nav-link {% if request.path.startswith('/notifications') %}active{% endif %}" href="{{ url_for('notifications_page') }}">알림{% if unread_notification_count %}<span class="notif-badge">{{ unread_notification_count }}</span>{% endif %}</a>
+        {% if g.security_configured %}
+        <form method="post" action="{{ url_for('lock_now') }}" style="display:inline;" class="lock-nav-wrap">
+          <button class="nav-link nav-link-btn" type="submit" title="잠금">🔒</button>
+          <span class="nav-countdown" id="lock-countdown">30:00</span>
+        </form>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  {% if recent_notifications %}
+  <div class="quick-notifications">
+    <div class="quick-notifications-inner">
+      {% for n in recent_notifications %}
+      <a class="quick-notification-item {% if not n.is_read %}unread{% endif %}" href="{{ url_for('open_notification', notification_id=n.id) }}">{{ n.message }}</a>
+      {% endfor %}
+      <a class="quick-notification-more" href="{{ url_for('notifications_page') }}">전체 알림 보기</a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if request.path == '/settings' or request.path.startswith('/settings/') %}
+  <div class="settings-subnav-wrap">
+    <div class="settings-subnav">
+            <a class="subnav-link {% if request.path.startswith('/settings/school') %}active{% endif %}" href="{{ url_for('school_settings') }}">학교 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/ai') %}active{% endif %}" href="{{ url_for('ai_settings') }}">AI 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/counsel-types') %}active{% endif %}" href="{{ url_for('counsel_types_settings') }}">상담유형</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/schedule-slots') %}active{% endif %}" href="{{ url_for('schedule_slots_settings') }}">시간/교시 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/lock') %}active{% endif %}" href="{{ url_for('lock_settings') }}">잠금설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/backup') %}active{% endif %}" href="{{ url_for('backup_settings') }}">백업 암호화</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/holidays') %}active{% endif %}" href="{{ url_for('holiday_settings') }}">임시공휴일 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/vacations') %}active{% endif %}" href="{{ url_for('vacation_settings') }}">방학기간 설정</a>
+      <a class="subnav-link {% if request.path.startswith('/settings/power') %}active{% endif %}" href="{{ url_for('power_settings') }}">전원</a>
+    </div>
+  </div>
+  {% endif %}
+
+  <main>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}
+            <li>{{ message }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+  {% if g.security_configured and request.endpoint not in ['unlock_screen', 'unlock_submit', 'security_setup', 'password_reset'] %}
+  <script>
+    const LOCK_TIMEOUT_MS = {{ lock_timeout_minutes }} * 60 * 1000;
+    let lockTimer = null;
+    let countdownTimer = null;
+    let remainingMs = LOCK_TIMEOUT_MS;
+    const countdownEl = document.getElementById('lock-countdown');
+
+    function formatCountdown(ms) {
+      const totalSec = Math.max(0, Math.floor(ms / 1000));
+      const min = String(Math.floor(totalSec / 60)).padStart(2, '0');
+      const sec = String(totalSec % 60).padStart(2, '0');
+      return `${min}:${sec}`;
+    }
+
+    function updateCountdownText() {
+      if (!countdownEl) return;
+      countdownEl.textContent = formatCountdown(remainingMs);
+    }
+
+    async function autoLock() {
+      try {
+        await fetch('{{ url_for("lock_now") }}', { method: 'POST' });
+      } finally {
+        window.location.href = '{{ url_for("unlock_screen") }}';
+      }
+    }
+
+    function resetLockTimer() {
+      if (lockTimer) clearTimeout(lockTimer);
+      remainingMs = LOCK_TIMEOUT_MS;
+      updateCountdownText();
+      lockTimer = setTimeout(autoLock, LOCK_TIMEOUT_MS);
+    }
+
+    function startCountdownTicker() {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = setInterval(() => {
+        remainingMs -= 1000;
+        if (remainingMs < 0) remainingMs = 0;
+        updateCountdownText();
+      }, 1000);
+    }
+
+    ['click', 'keydown', 'mousemove', 'scroll', 'touchstart'].forEach((eventName) => {
+      window.addEventListener(eventName, resetLockTimer, { passive: true });
+    });
+
+    resetLockTimer();
+    startCountdownTicker();
+  </script>
+  {% endif %}
+
+</body>
+</html>

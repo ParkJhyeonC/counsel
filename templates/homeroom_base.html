@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title or '담임교사 페이지' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="icon" href="{{ url_for('favicon') }}">
+</head>
+<body>
+  <main style="max-width: 1100px; margin-top: 2rem;">
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul class="flashes">
+          {% for message in messages %}<li>{{ message }}</li>{% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+
+    <section class="card" style="margin-bottom: 1rem;">
+      <div class="page-intro">
+        <div>
+          <h1 style="margin:0;">담임교사 페이지</h1>
+          {% if session.get('homeroom_teacher_name') %}
+          <p class="muted" style="margin:.35rem 0 0;">{{ session.get('homeroom_teacher_name') }} 담임교사</p>
+          {% endif %}
+        </div>
+        <div class="button-row">
+          {% if session.get('homeroom_authenticated') %}
+          <a class="btn btn-secondary" href="{{ url_for('homeroom_dashboard') }}">내 반 현황</a>
+          <a class="btn btn-secondary" href="{{ url_for('homeroom_referral_new') }}">상담의뢰서 작성</a>
+          <a class="btn btn-secondary" href="{{ url_for('homeroom_change_password') }}">비밀번호 변경</a>
+          <form method="post" action="{{ url_for('homeroom_logout') }}" style="display:inline;">
+            <button class="btn btn-secondary" type="submit">로그아웃</button>
+          </form>
+          {% else %}
+          <a class="btn btn-secondary" href="{{ url_for('unlock_screen') }}">상담교사 잠금화면</a>
+          {% endif %}
+        </div>
+      </div>
+    </section>
+
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>백업 암호화 설정</h2>
+  <p class="muted">백업 파일 해독을 어렵게 하려면 암호를 설정하세요. 설정 후 생성되는 백업은 <code>.zip.enc</code> 형식으로 저장됩니다.</p>
+
+  <div class="button-row" style="margin:.45rem 0 .25rem;">
+    <span class="absence-count">현재 적용 경로: {{ effective_source }}</span>
+    <span class="absence-count">환경변수: {{ '설정됨' if env_configured else '미설정' }}</span>
+    <span class="absence-count">앱 저장 암호: {{ '설정됨' if has_stored_passphrase else '미설정' }}</span>
+  </div>
+
+  <form method="post" class="grid-form" style="margin-top:.65rem;">
+    <input type="hidden" name="action" value="save">
+    <label>백업 암호
+      <input type="password" name="backup_passphrase" minlength="8" placeholder="8자 이상" required>
+    </label>
+    <label>백업 암호 확인
+      <input type="password" name="backup_passphrase_confirm" minlength="8" required>
+    </label>
+    <button class="btn" type="submit">암호 저장</button>
+  </form>
+
+  <form method="post" style="margin-top:.6rem;">
+    <input type="hidden" name="action" value="clear">
+    <button class="btn btn-secondary" type="submit" onclick="return confirm('저장된 백업 암호를 삭제할까요?');">저장 암호 삭제</button>
+  </form>
+
+  <p class="muted" style="margin-top:.8rem;">주의: 설정 탭에 저장한 암호는 로컬 DB(app_settings)에 저장됩니다. 더 강한 보안이 필요하면 OS 환경변수 <code>COUNSELOG_BACKUP_PASSPHRASE</code>를 사용하세요.</p>
+</section>
+{% endblock %}

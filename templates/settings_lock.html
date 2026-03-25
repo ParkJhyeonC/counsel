@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>잠금설정</h2>
+  <p class="muted">잠금 비밀번호 변경 시 현재 비밀번호 확인이 필요합니다.</p>
+  <p class="muted">다른 PC/기기에서 접속하면 기존 세션과 관계없이 항상 잠금화면부터 시작합니다.</p>
+
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="change_password">
+    <label>현재 비밀번호 <input type="password" name="current_password" required></label>
+    <label>새 비밀번호 <input type="password" name="new_password" minlength="4" required></label>
+    <label>새 비밀번호 확인 <input type="password" name="new_password_confirm" minlength="4" required></label>
+    <button class="btn" type="submit">비밀번호 변경</button>
+  </form>
+</section>
+
+<section class="card">
+  <h2>잠금 카운트다운 시간</h2>
+  <form method="post" class="grid-form">
+    <input type="hidden" name="action" value="set_timeout">
+    <label>자동 잠금 시간(분)
+      <input type="number" name="lock_timeout_minutes" min="1" max="240" value="{{ lock_timeout_minutes }}" required>
+    </label>
+    <button class="btn" type="submit">시간 저장</button>
+  </form>
+  <p class="muted">설정한 시간 동안 활동이 없으면 자동으로 잠금됩니다.</p>
+</section>
+{% endblock %}

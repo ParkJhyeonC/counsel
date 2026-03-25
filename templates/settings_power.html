@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h2>전원</h2>
+  <p class="muted">현재 실행 중인 counselog 서버를 안전하게 종료합니다.</p>
+
+  {% if shutting_down %}
+  <p><strong>서버 종료 요청을 보냈습니다.</strong> 잠시 후 페이지가 닫히지 않으면 창을 직접 닫아 주세요.</p>
+  {% else %}
+  <form method="post" onsubmit="return confirm('정말 서버를 종료할까요? 저장되지 않은 작업이 있으면 사라질 수 있습니다.');">
+    <input type="hidden" name="action" value="shutdown">
+    <button class="btn btn-danger" type="submit">서버 종료</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

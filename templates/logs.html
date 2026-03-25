@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>상담일지 확인</h2>
+      <p class="muted">작성된 상담일지를 날짜순으로 확인할 수 있습니다.</p>
+    </div>
+    <a class="btn" href="{{ url_for('new_log') }}">상담일지 작성</a>
+  </div>
+
+  <form method="get" class="search-form">
+    <label>검색
+      <input name="q" value="{{ q }}" placeholder="학생명/유형/제목/날짜 검색">
+    </label>
+    <button class="btn" type="submit">조회</button>
+  </form>
+
+  <table>
+    <thead><tr><th>상담일</th><th>학생</th><th>유형</th><th>제목</th><th>상세</th><th>확인증</th></tr></thead>
+    <tbody>
+      {% for row in logs %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.grade or '-' }}학년 {{ row.class_no or row.class_name or '-' }}반 {{ row.student_name }}</td>
+        <td>{{ row.type }}</td>
+        <td>{{ row.summary }}</td>
+        <td><a class="btn btn-secondary" href="{{ url_for('student_detail', student_id=row.student_id) }}">열기</a></td>
+        <td><a class="btn btn-secondary" href="{{ url_for('log_confirmation', log_id=row.id) }}" target="_blank">출력</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">상담일지가 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div class="page-intro" style="margin-top:.7rem;align-items:center;">
+    <p class="muted" style="margin:0;">총 {{ total_count }}건 · {{ page }} / {{ total_pages }} 페이지 (페이지당 {{ page_size }}건)</p>
+    <div class="button-row" style="gap:.35rem;">
+      {% if page > 1 %}
+      <a class="btn btn-secondary" href="{{ url_for('logs_list', q=q, page=page-1) }}">이전</a>
+      {% endif %}
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+        <span class="btn" style="pointer-events:none;opacity:.85;">{{ p }}</span>
+        {% elif p <= 2 or p > total_pages - 2 or (p >= page - 1 and p <= page + 1) %}
+        <a class="btn btn-secondary" href="{{ url_for('logs_list', q=q, page=p) }}">{{ p }}</a>
+        {% elif p == 3 and page > 4 %}
+        <span class="muted" style="align-self:center;">…</span>
+        {% elif p == total_pages - 2 and page < total_pages - 3 %}
+        <span class="muted" style="align-self:center;">…</span>
+        {% endif %}
+      {% endfor %}
+      {% if page < total_pages %}
+      <a class="btn btn-secondary" href="{{ url_for('logs_list', q=q, page=page+1) }}">다음</a>
+      {% endif %}
+    </div>
+  </div>
+
+</section>
+{% endblock %}

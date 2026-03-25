@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <div class="calendar-header">
+    <h2>월간 상담 달력</h2>
+    <div class="calendar-nav">
+      <a class="btn" href="{{ url_for('schedule', month=prev_month, date=prev_month ~ '-01') }}">◀ 이전달</a>
+      <strong>{{ month_title }}</strong>
+      <a class="btn" href="{{ url_for('schedule', month=next_month, date=next_month ~ '-01') }}">다음달 ▶</a>
+    </div>
+  </div>
+
+  <div class="month-grid">
+    <div class="week-label sunday">일</div><div class="week-label">월</div><div class="week-label">화</div>
+    <div class="week-label">수</div><div class="week-label">목</div><div class="week-label">금</div><div class="week-label saturday">토</div>
+
+    {% for week in calendar_weeks %}
+      {% for day in week %}
+      <div class="day-cell {% if not day.is_current_month %}outside{% endif %} {% if day.is_selected %}selected{% endif %} {% if day.is_today %}today{% endif %} {% if day.is_holiday %}holiday{% endif %} {% if day.is_saturday %}saturday{% endif %} {% if day.is_sunday %}sunday{% endif %}">
+        <a class="day-number" href="{{ url_for('schedule', month=selected_month, date=day.date) }}">{{ day.day }}</a>
+        {% if day.is_holiday %}<div class="holiday-chip">{{ day.holiday_name }}</div>{% endif %}
+        {% for item in day.schedules %}
+          <div class="event-chip {{ item.status }}">
+            {{ item.schedule_time or '시간미정' }} {{ item.title }}
+          </div>
+        {% endfor %}
+        {% if day.extra_count > 0 %}
+          <div class="more-chip">+{{ day.extra_count }}건 더 있음</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="page-intro">
+    <div>
+      <h2>{% if edit_schedule %}상담 일정 수정{% else %}상담 일정 등록{% endif %}</h2>
+      <p class="muted">학년/반 필터로 학생을 빠르게 찾을 수 있습니다.</p>
+      {% if prefill_request %}<p class="muted">상담신청 도착 알림에서 불러온 데이터가 자동 입력되었습니다.</p>{% endif %}
+    </div>
+    <a class="btn btn-secondary" href="{{ url_for('new_log') }}">상담일지 작성</a>
+  </div>
+  <form method="post" class="grid-form">
+    <input type="hidden" name="request_id" value="{{ prefill_request.id if prefill_request else "" }}">
+    <input type="hidden" name="edit_id" value="{{ edit_schedule.id if edit_schedule else '' }}">
+    <label>학년
+      <select id="schedule-grade-filter">
+        <option value="">전체</option>
+        {% for grade in grades %}
+        <option value="{{ grade }}">{{ grade }}학년</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>반
+      <select id="schedule-class-filter">
+        <option value="">전체</option>
+      </select>
+    </label>
+    <p class="form-hint full" id="schedule-student-filter-hint"></p>
+    <label class="full">학생
+      <select name="student_id" id="schedule-student-select">
+        <option value="">미지정</option>
+        {% for s in students %}
+        <option value="{{ s.id }}" data-grade="{{ s.grade or '' }}" data-class="{{ s.class_no or '' }}" {% if (edit_schedule and edit_schedule.student_id == s.id) or (not edit_schedule and prefill_student_id and prefill_student_id == (s.id|string)) %}selected{% endif %}>{{ s.grade or '-' }}학년 {{ s.class_no or s.class_name or '-' }}반 {{ s.name }} ({{ s.student_no }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>상담일 <input type="date" name="schedule_date" value="{{ edit_schedule.schedule_date if edit_schedule else prefill_date }}" required></label>
+    <label>시간/교시
+      {% set selected_slot = edit_schedule.schedule_time if edit_schedule else prefill_slot %}
+      <select name="schedule_slot">
+        <option value="" {% if selected_slot == '' %}selected{% endif %}>미정</option>
+        {% for slot in schedule_slots %}
+        <option value="{{ slot }}" {% if selected_slot == slot %}selected{% endif %}>{{ slot }}</option>
+        {% endfor %}
+        <option value="직접입력" {% if selected_slot and selected_slot not in schedule_slots %}selected{% endif %}>직접입력</option>
+      </select>
+    </label>
+    <label>직접입력 시간/교시 <input name="custom_slot" value="{% if edit_schedule and edit_schedule.schedule_time and edit_schedule.schedule_time not in schedule_slots %}{{ edit_schedule.schedule_time }}{% elif (not edit_schedule) and prefill_custom_slot %}{{ prefill_custom_slot }}{% endif %}" placeholder="예: 점심시간, 방과후"></label>
+    <label class="full">일정 제목 <input name="title" value="{{ edit_schedule.title if edit_schedule else prefill_title }}" required placeholder="예: 진로상담 2차"></label>
+    <label class="full">메모 <textarea name="note" rows="3" placeholder="상담 준비사항">{{ edit_schedule.note if edit_schedule else prefill_note }}</textarea></label>
+    <button class="btn" type="submit">{% if edit_schedule %}일정 수정 저장{% else %}일정 등록{% endif %}</button>
+    {% if edit_schedule %}
+    <a class="btn btn-secondary" href="{{ url_for('schedule', date=selected_date, month=selected_month) }}">수정 취소</a>
+    {% endif %}
+  </form>
+</section>
+
+<section class="card">
+  <h2>{{ selected_date }} 상담 일정</h2>
+  <table>
+    <thead><tr><th>시간</th><th>학생</th><th>제목</th><th>상태</th><th>처리</th></tr></thead>
+    <tbody>
+      {% for row in schedules_for_date %}
+      <tr>
+        <td>{{ row.schedule_time or '-' }}</td>
+        <td>
+          {% if row.student_id %}
+            <a href="{{ url_for('student_detail', student_id=row.student_id) }}">{{ row.student_name }}</a>
+          {% else %}
+            미지정
+          {% endif %}
+        </td>
+        <td>{{ row.title }}</td>
+        <td>{{ row.status }}</td>
+        <td>
+          {% if row.status == 'planned' %}
+            <a class="btn" href="{{ url_for('new_log', schedule_id=row.id) }}">상담일지 등록</a>
+            <a class="btn" href="{{ url_for('schedule', date=selected_date, month=selected_month, edit_id=row.id) }}">일정 수정</a>
+            <form method="post" action="{{ url_for('schedule', date=selected_date, month=selected_month) }}" style="display:inline;">
+              <input type="hidden" name="action" value="delete_schedule">
+              <input type="hidden" name="schedule_id" value="{{ row.id }}">
+              <input type="hidden" name="selected_date" value="{{ selected_date }}">
+              <input type="hidden" name="selected_month" value="{{ selected_month }}">
+              <button class="btn btn-secondary" type="submit" onclick="return confirm('해당 상담 일정을 삭제할까요?');">일정 삭제</button>
+            </form>
+          {% else %}
+            완료
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">해당 날짜 일정이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>예정된 상담 일정(전체)</h2>
+  <table>
+    <thead><tr><th>날짜</th><th>시간</th><th>학생</th><th>제목</th></tr></thead>
+    <tbody>
+      {% for row in upcoming_schedules %}
+      <tr>
+        <td>{{ row.schedule_date }}</td>
+        <td>{{ row.schedule_time or '-' }}</td>
+        <td>{{ row.student_name or '미지정' }}</td>
+        <td>{{ row.title }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4">예정된 일정이 없습니다.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<script>
+  const scheduleGradeClassMap = {{ grade_class_map | tojson }};
+  const sg = document.getElementById('schedule-grade-filter');
+  const sc = document.getElementById('schedule-class-filter');
+  const ss = document.getElementById('schedule-student-select');
+  const sh = document.getElementById('schedule-student-filter-hint');
+
+  function fillScheduleClassOptions() {
+    const grade = sg.value;
+    const classes = grade ? (scheduleGradeClassMap[grade] || []) : [];
+    const prev = sc.value;
+    sc.innerHTML = '<option value="">전체</option>';
+    classes.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c;
+      opt.textContent = `${c}반`;
+      sc.appendChild(opt);
+    });
+    if (classes.includes(prev)) sc.value = prev;
+  }
+
+  function filterScheduleStudents() {
+    const grade = sg.value;
+    const klass = sc.value;
+    let visibleCount = 0;
+    [...ss.options].forEach((opt, idx) => {
+      if (idx === 0) return;
+      const matchesGrade = !grade || opt.dataset.grade === grade;
+      const matchesClass = !klass || opt.dataset.class === klass;
+      opt.hidden = !(matchesGrade && matchesClass);
+      if (!opt.hidden) visibleCount += 1;
+    });
+    if (ss.selectedOptions[0]?.hidden) ss.value = '';
+    sh.textContent = `현재 조건에서 선택 가능한 학생: ${visibleCount}명`;
+  }
+
+  sg.addEventListener('change', () => {
+    fillScheduleClassOptions();
+    filterScheduleStudents();
+  });
+  sc.addEventListener('change', filterScheduleStudents);
+
+  fillScheduleClassOptions();
+  filterScheduleStudents();
+</script>
+{% endblock %}
